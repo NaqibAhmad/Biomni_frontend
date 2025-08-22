@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Wrench, Code, BookOpen, Copy } from 'lucide-react';
+import { Search, Wrench, Copy } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import { ToolSchema } from '@/types/biomni';
 import { copyToClipboard } from '@/lib/utils';
