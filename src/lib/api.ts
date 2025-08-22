@@ -413,7 +413,7 @@ class BiomniAPI {
         path: response.data.configuration.path || '',
         timeout_seconds: response.data.configuration.timeout_seconds || 300,
         llm: response.data.configuration.llm || 'Unknown',
-        temperature: 0.7, // Not provided by backend
+        temperature: response.data.configuration.temperature, // Not provided by backend
         use_tool_retriever: response.data.configuration.use_tool_retriever || true,
         source: response.data.configuration.source || 'Unknown'
       };
