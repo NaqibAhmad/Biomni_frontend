@@ -4,10 +4,5 @@
       "source": "/api/:path*",
       "destination": "/api/proxy/:path*"
     }
-  ],
-  "functions": {
-    "api/proxy/**/*.js": {
-      "maxDuration": 300
-    }
-  }
+  ]
 }

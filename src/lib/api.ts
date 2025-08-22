@@ -60,13 +60,14 @@ class BiomniAPI {
   private client: AxiosInstance;
   private baseURL: string;
 
-  constructor(baseURL: string = '/api') {
+  constructor(baseURL: string = 'https://allowing-ultimately-roughy.ngrok-free.app') {
     this.baseURL = baseURL;
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 300000, // 5 minutes for long-running queries
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '69420',
       },
     });
 
