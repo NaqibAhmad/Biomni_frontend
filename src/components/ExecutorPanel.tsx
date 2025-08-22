@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Copy, Wrench, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, Brain, Code, Eye, Zap } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Wrench, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, Brain, Code, Eye, Zap, Image } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 
 interface ExecutionLog {
