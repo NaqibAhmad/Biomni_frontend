@@ -67,6 +67,7 @@ class BiomniAPI {
       timeout: 300000, // 5 minutes for long-running queries
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '69420',
       },
     });
 
@@ -188,7 +189,9 @@ class BiomniAPI {
   // Tool Management
   async getToolRegistry(): Promise<APIResponse<ToolRegistry>> {
     try {
+      console.log('Fetching tool registry from:', `${this.baseURL}/api/system/info`);
       const response: AxiosResponse<BackendSystemInfo> = await this.client.get('/api/system/info');
+      console.log('Tool registry response:', response.data);
       
       // Convert backend tools to frontend format
       const tools: ToolSchema[] = response.data.tools.map(tool => ({
@@ -209,6 +212,7 @@ class BiomniAPI {
         message: `Retrieved ${tools.length} tools successfully`
       };
     } catch (error) {
+      console.error('Error fetching tool registry:', error);
       throw this.handleError(error, 'Failed to get tool registry');
     }
   }
@@ -289,7 +293,9 @@ class BiomniAPI {
   // Data Lake Management
   async getDataLake(): Promise<APIResponse<DataLakeItem[]>> {
     try {
+      console.log('Fetching data lake from:', `${this.baseURL}/api/system/info`);
       const response: AxiosResponse<BackendSystemInfo> = await this.client.get('/api/system/info');
+      console.log('Data lake response:', response.data);
       
       // Convert backend data lake items to frontend format
       const dataLakeItems: DataLakeItem[] = response.data.data_lake.map(item => ({
@@ -304,6 +310,7 @@ class BiomniAPI {
         message: `Retrieved ${dataLakeItems.length} data lake items`
       };
     } catch (error) {
+      console.error('Error fetching data lake:', error);
       throw this.handleError(error, 'Failed to get data lake');
     }
   }
@@ -465,7 +472,9 @@ class BiomniAPI {
   // Health Check
   async healthCheck(): Promise<APIResponse<{ status: string; timestamp: string }>> {
     try {
+      console.log('Performing health check on:', `${this.baseURL}/health`);
       const response: AxiosResponse<BackendHealthResponse> = await this.client.get('/health');
+      console.log('Health check response:', response.data);
       return {
         success: true,
         data: {
@@ -475,7 +484,19 @@ class BiomniAPI {
         message: `Health check successful. Agent initialized: ${response.data.agent_initialized}`
       };
     } catch (error) {
+      console.error('Health check failed:', error);
       throw this.handleError(error, 'Failed to perform health check');
+    }
+  }
+
+  // Simple connectivity test
+  async testConnectivity(): Promise<boolean> {
+    try {
+      await this.healthCheck();
+      return true;
+    } catch (error) {
+      console.error('Connectivity test failed:', error);
+      return false;
     }
   }
 

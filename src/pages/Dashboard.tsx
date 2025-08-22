@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Activity, 
   Database, 
@@ -13,6 +13,7 @@ import {
   Dna
 } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
+import { biomniAPI } from '@/lib/api';
 
 const quickActions = [
   {
@@ -90,24 +91,51 @@ export function Dashboard() {
     loadCustomResources,
   } = useAgentStore();
 
+  const [connectivityStatus, setConnectivityStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [connectivityError, setConnectivityError] = useState<string>('');
+
   useEffect(() => {
-    // Load resources if not already loaded
-    if (isInitialized) {
+    // Test connectivity first
+    const testConnectivity = async () => {
+      try {
+        setConnectivityStatus('checking');
+        const isConnected = await biomniAPI.testConnectivity();
+        if (isConnected) {
+          setConnectivityStatus('connected');
+          setConnectivityError('');
+        } else {
+          setConnectivityStatus('disconnected');
+          setConnectivityError('Backend is not reachable');
+        }
+      } catch (error) {
+        setConnectivityStatus('disconnected');
+        setConnectivityError(error instanceof Error ? error.message : 'Connection failed');
+      }
+    };
+
+    testConnectivity();
+  }, []);
+
+  useEffect(() => {
+    // Load resources if connected and initialized
+    if (connectivityStatus === 'connected' && isInitialized) {
       const loadResources = async () => {
         try {
+          console.log('Loading dashboard resources...');
           await Promise.all([
             loadTools(),
             loadDataLake(),
             loadSoftwareLibrary(),
             loadCustomResources(),
           ]);
+          console.log('Dashboard resources loaded successfully');
         } catch (error) {
           console.error('Failed to load dashboard resources:', error);
         }
       };
       loadResources();
     }
-  }, [isInitialized, loadTools, loadDataLake, loadSoftwareLibrary, loadCustomResources]);
+  }, [connectivityStatus, isInitialized, loadTools, loadDataLake, loadSoftwareLibrary, loadCustomResources]);
 
   const stats = [
     {
@@ -166,6 +194,16 @@ export function Dashboard() {
             <div className={`w-3 h-3 rounded-full ${isProcessing ? 'bg-warning-500' : 'bg-gray-400'}`}></div>
             <span className="text-sm text-gray-600">
               Status: {systemStatus.processing}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${
+              connectivityStatus === 'connected' ? 'bg-success-500' : 
+              connectivityStatus === 'checking' ? 'bg-warning-500' : 'bg-error-500'
+            }`}></div>
+            <span className="text-sm text-gray-600">
+              Backend: {connectivityStatus === 'connected' ? 'Connected' : 
+                       connectivityStatus === 'checking' ? 'Checking...' : 'Disconnected'}
             </span>
           </div>
         </div>
@@ -258,6 +296,13 @@ export function Dashboard() {
                 <div className="flex items-center gap-2 p-3 bg-error-50 rounded-md">
                   <AlertCircle className="w-4 h-4 text-error-600" />
                   <span className="text-sm text-error-700">{error}</span>
+                </div>
+              )}
+              
+              {connectivityError && (
+                <div className="flex items-center gap-2 p-3 bg-error-50 rounded-md">
+                  <AlertCircle className="w-4 h-4 text-error-600" />
+                  <span className="text-sm text-error-700">Backend Error: {connectivityError}</span>
                 </div>
               )}
             </div>
