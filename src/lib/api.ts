@@ -60,7 +60,7 @@ class BiomniAPI {
   private client: AxiosInstance;
   private baseURL: string;
 
-  constructor(baseURL: string = 'http://localhost:8000') {
+  constructor(baseURL: string = 'https://allowing-ultimately-roughy.ngrok-free.app') {
     this.baseURL = baseURL;
     this.client = axios.create({
       baseURL: this.baseURL,
