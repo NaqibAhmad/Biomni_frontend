@@ -3,7 +3,6 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { biomniAPI } from '@/lib/api';
 import {
   BiomniConfig,
-  AgentStatus,
   ChatMessage,
   AgentQueryRequest,
   AgentInitRequest,

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Database, Search, Plus, FileText, Download, Trash2 } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
-import { DataLakeItem } from '@/types/biomni';
 import { UploadDataModal } from '@/components/modals/UploadDataModal';
 
 export function DataLake() {

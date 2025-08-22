@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import { BiomniConfig } from '@/types/biomni';
 import toast from 'react-hot-toast';

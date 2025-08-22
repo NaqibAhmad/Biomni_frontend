@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Wrench, Code, BookOpen, Eye, Copy } from 'lucide-react';
+import { Search, Wrench, Code, BookOpen, Copy } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import { ToolSchema } from '@/types/biomni';
 import { copyToClipboard } from '@/lib/utils';
@@ -40,24 +40,6 @@ export function Tools() {
     } catch (error) {
       toast.error('Failed to copy tool information');
     }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, any> = {
-      'database': Database,
-      'genomics': Code,
-      'molecular_biology': Wrench,
-      'biochemistry': FlaskConical,
-      'cell_biology': Microscope,
-      'default': BookOpen,
-    };
-    
-    for (const [key, icon] of Object.entries(icons)) {
-      if (category.toLowerCase().includes(key)) {
-        return icon;
-      }
-    }
-    return icons.default;
   };
 
   return (
@@ -262,6 +244,3 @@ export function Tools() {
     </div>
   );
 }
-
-// Import missing icons
-import { Database, FlaskConical, Microscope } from 'lucide-react';

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { X, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import toast from 'react-hot-toast';
 

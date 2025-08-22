@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Copy, Wrench, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, FileText, Brain, Code, Eye, Zap, Download, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Wrench, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, Brain, Code, Eye, Zap, Download, Image } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 
 interface ExecutionLog {
@@ -30,7 +30,7 @@ interface ExecutorPanelProps {
 }
 
 export function ExecutorPanel({ className = '' }: ExecutorPanelProps) {
-  const { isProcessing, currentTask, executorLogs, addExecutorLog, clearExecutorLogs } = useAgentStore();
+  const { isProcessing, executorLogs, clearExecutorLogs } = useAgentStore();
   const [currentStatus, setCurrentStatus] = useState<string>('Ready');
   const [collapsedLogs, setCollapsedLogs] = useState<Set<string>>(new Set());
   const logsEndRef = useRef<HTMLDivElement>(null);

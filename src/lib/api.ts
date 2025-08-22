@@ -138,7 +138,7 @@ class BiomniAPI {
     }
   }
 
-  async streamQuery(request: AgentQueryRequest): Promise<ReadableStream<StreamResponse>> {
+  async streamQuery(_request: AgentQueryRequest): Promise<ReadableStream<StreamResponse>> {
     try {
       // Streaming is handled via WebSocket connection
       // This method should not be called directly
@@ -264,7 +264,7 @@ class BiomniAPI {
     }
   }
 
-  async removeCustomTool(name: string): Promise<APIResponse<boolean>> {
+  async removeCustomTool(_name: string): Promise<APIResponse<boolean>> {
     try {
       // Custom tool removal is not implemented in the backend yet
       throw new Error('Custom tool removal not yet implemented in backend');
@@ -308,7 +308,7 @@ class BiomniAPI {
     }
   }
 
-  async addCustomData(data: DataAddRequest): Promise<APIResponse<CustomData>> {
+  async addCustomData(_data: DataAddRequest): Promise<APIResponse<CustomData>> {
     try {
       // This method is now handled by the upload modal directly
       // The upload modal makes the API call to /api/data/upload
@@ -318,7 +318,7 @@ class BiomniAPI {
     }
   }
 
-  async removeCustomData(name: string): Promise<APIResponse<boolean>> {
+  async removeCustomData(_name: string): Promise<APIResponse<boolean>> {
     try {
       // Custom data removal is not implemented in the backend yet
       throw new Error('Custom data removal not yet implemented in backend');
@@ -357,7 +357,7 @@ class BiomniAPI {
     }
   }
 
-  async addCustomSoftware(software: SoftwareAddRequest): Promise<APIResponse<CustomSoftware>> {
+  async addCustomSoftware(_software: SoftwareAddRequest): Promise<APIResponse<CustomSoftware>> {
     try {
       // Custom software addition is not implemented in the backend yet
       throw new Error('Custom software addition not yet implemented in backend');
@@ -366,7 +366,7 @@ class BiomniAPI {
     }
   }
 
-  async removeCustomSoftware(name: string): Promise<APIResponse<boolean>> {
+  async removeCustomSoftware(_name: string): Promise<APIResponse<boolean>> {
     try {
       // Custom software removal is not implemented in the backend yet
       throw new Error('Custom software removal not yet implemented in backend');
@@ -385,7 +385,7 @@ class BiomniAPI {
   }
 
   // MCP Integration
-  async addMCP(config: MCPAddRequest): Promise<APIResponse<void>> {
+  async addMCP(_config: MCPAddRequest): Promise<APIResponse<void>> {
     try {
       // MCP integration is not implemented in the backend yet
       throw new Error('MCP integration not yet implemented in backend');
@@ -394,7 +394,7 @@ class BiomniAPI {
     }
   }
 
-  async createMCPServer(toolModules?: string[]): Promise<APIResponse<string>> {
+  async createMCPServer(_toolModules?: string[]): Promise<APIResponse<string>> {
     try {
       // MCP server creation is not implemented in the backend yet
       throw new Error('MCP server creation not yet implemented in backend');
@@ -453,7 +453,7 @@ class BiomniAPI {
   }
 
   // Resource Retrieval
-  async retrieveResources(query: string): Promise<APIResponse<RetrieverResult>> {
+  async retrieveResources(_query: string): Promise<APIResponse<RetrieverResult>> {
     try {
       // Resource retrieval is not implemented in the backend yet
       throw new Error('Resource retrieval not yet implemented in backend');

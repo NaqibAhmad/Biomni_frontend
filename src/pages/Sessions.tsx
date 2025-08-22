@@ -4,7 +4,7 @@ import { ResearchSession } from '@/types/biomni';
 import { formatDate } from '@/lib/utils';
 
 export function Sessions() {
-  const [sessions, setSessions] = useState<ResearchSession[]>([]);
+  const [sessions] = useState<ResearchSession[]>([]);
 
   return (
     <div className="p-6 space-y-6">

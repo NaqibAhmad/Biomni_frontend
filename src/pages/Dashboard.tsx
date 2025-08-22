@@ -8,14 +8,11 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Play,
   BookOpen,
   FlaskConical,
   Dna
 } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
-import { biomniAPI } from '@/lib/api';
-import toast from 'react-hot-toast';
 
 const quickActions = [
   {
