@@ -101,7 +101,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         formData.append('name', file.name);
 
         // Upload file
-        const response = await fetch('http://localhost:8000/api/data/upload', {
+        const response = await fetch('https://allowing-ultimately-roughy.ngrok-free.app/api/data/upload', {
           method: 'POST',
           body: formData,
         });
