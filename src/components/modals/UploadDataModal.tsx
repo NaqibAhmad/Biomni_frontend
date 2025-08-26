@@ -103,8 +103,8 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         // Upload file
         const isProduction = window.location.hostname.includes('vercel.app');
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProduction 
-          ? '/api/proxy'  // Vercel proxy route
-          : 'http://18.212.99.49:8000'  // Direct connection for local
+          ? 'http://18.212.99.49'  // Vercel proxy route
+          : 'http://18.212.99.49'  // Direct connection for local
         );
         console.log('Upload API Base URL:', apiBaseUrl);
         console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
