@@ -63,6 +63,11 @@ class BiomniAPI {
   constructor(baseURL?: string) {
     // Use environment variable for production, fallback to IP for local development
     this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || 'http://18.212.99.49/';
+    
+    // Debug logging
+    console.log('API Base URL:', this.baseURL);
+    console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 300000, // 5 minutes for long-running queries

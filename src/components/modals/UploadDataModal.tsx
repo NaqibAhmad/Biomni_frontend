@@ -102,6 +102,9 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
 
         // Upload file
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://18.212.99.49';
+        console.log('Upload API Base URL:', apiBaseUrl);
+        console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+        
         const response = await fetch(`${apiBaseUrl}/api/data/upload`, {
           method: 'POST',
           body: formData,
