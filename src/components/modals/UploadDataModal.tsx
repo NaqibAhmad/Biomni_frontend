@@ -101,7 +101,8 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         formData.append('name', file.name);
 
         // Upload file
-        const response = await fetch('http://18.212.99.49/api/data/upload', {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://18.212.99.49';
+        const response = await fetch(`${apiBaseUrl}/api/data/upload`, {
           method: 'POST',
           body: formData,
         });
