@@ -101,9 +101,14 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         formData.append('name', file.name);
 
         // Upload file
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://18.212.99.49';
+        const isProduction = window.location.hostname.includes('vercel.app');
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProduction 
+          ? 'https://api.codetabs.com/v1/proxy?quest=http://18.212.99.49'  // Public proxy
+          : 'http://18.212.99.49'  // Direct connection for local
+        );
         console.log('Upload API Base URL:', apiBaseUrl);
         console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+        console.log('Is Production:', isProduction);
         
         const response = await fetch(`${apiBaseUrl}/api/data/upload`, {
           method: 'POST',

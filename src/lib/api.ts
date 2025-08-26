@@ -61,12 +61,18 @@ class BiomniAPI {
   private baseURL: string;
 
   constructor(baseURL?: string) {
-    // Use environment variable for production, fallback to IP for local development
-    this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || 'http://18.212.99.49/';
+    // Use environment variable for production, fallback to proxy service for production
+    const isProduction = window.location.hostname.includes('vercel.app');
+    const defaultUrl = isProduction 
+      ? 'https://api.codetabs.com/v1/proxy?quest=http://18.212.99.49'  // Public proxy
+      : 'http://18.212.99.49/';  // Direct connection for local
+    
+    this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || defaultUrl;
     
     // Debug logging
     console.log('API Base URL:', this.baseURL);
     console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+    console.log('Is Production:', isProduction);
     
     this.client = axios.create({
       baseURL: this.baseURL,
