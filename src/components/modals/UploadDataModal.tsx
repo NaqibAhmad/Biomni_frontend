@@ -103,7 +103,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         // Upload file
         const isProduction = window.location.hostname.includes('vercel.app');
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProduction 
-          ? 'https://api.codetabs.com/v1/proxy?quest=http://18.212.99.49'  // Public proxy
+          ? 'https://thingproxy.freeboard.io/fetch/http://18.212.99.49'  // More reliable proxy
           : 'http://18.212.99.49'  // Direct connection for local
         );
         console.log('Upload API Base URL:', apiBaseUrl);

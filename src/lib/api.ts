@@ -64,7 +64,7 @@ class BiomniAPI {
     // Use environment variable for production, fallback to proxy service for production
     const isProduction = window.location.hostname.includes('vercel.app');
     const defaultUrl = isProduction 
-      ? 'https://api.codetabs.com/v1/proxy?quest=http://18.212.99.49'  // Public proxy
+      ? 'https://thingproxy.freeboard.io/fetch/http://18.212.99.49'  // More reliable proxy
       : 'http://18.212.99.49/';  // Direct connection for local
     
     this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || defaultUrl;
