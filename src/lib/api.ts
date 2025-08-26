@@ -205,6 +205,16 @@ class BiomniAPI {
       const response: AxiosResponse<BackendSystemInfo> = await this.client.get('/api/system/info');
       console.log('Tool registry response:', response.data);
       
+      // Check if response.data exists and has the expected structure
+      if (!response.data) {
+        throw new Error('No data received from backend');
+      }
+      
+      if (!response.data.tools || !Array.isArray(response.data.tools)) {
+        console.error('Unexpected response structure:', response.data);
+        throw new Error('Backend response does not contain tools array');
+      }
+      
       // Convert backend tools to frontend format
       const tools: ToolSchema[] = response.data.tools.map(tool => ({
         name: tool.name,
@@ -308,6 +318,16 @@ class BiomniAPI {
       console.log('Fetching data lake from:', `${this.baseURL}/api/system/info`);
       const response: AxiosResponse<BackendSystemInfo> = await this.client.get('/api/system/info');
       console.log('Data lake response:', response.data);
+      
+      // Check if response.data exists and has the expected structure
+      if (!response.data) {
+        throw new Error('No data received from backend');
+      }
+      
+      if (!response.data.data_lake || !Array.isArray(response.data.data_lake)) {
+        console.error('Unexpected response structure:', response.data);
+        throw new Error('Backend response does not contain data_lake array');
+      }
       
       // Convert backend data lake items to frontend format
       const dataLakeItems: DataLakeItem[] = response.data.data_lake.map(item => ({
