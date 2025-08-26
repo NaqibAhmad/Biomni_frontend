@@ -61,10 +61,10 @@ class BiomniAPI {
   private baseURL: string;
 
   constructor(baseURL?: string) {
-    // Use environment variable for production, fallback to proxy service for production
+    // Use environment variable for production, fallback to Cloudflare Worker for production
     const isProduction = window.location.hostname.includes('vercel.app');
     const defaultUrl = isProduction 
-      ? 'https://thingproxy.freeboard.io/fetch/http://18.212.99.49'  // More reliable proxy
+      ? 'https://biomni-api-proxy.your-subdomain.workers.dev'  // Cloudflare Worker
       : 'http://18.212.99.49/';  // Direct connection for local
     
     this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || defaultUrl;
