@@ -678,7 +678,7 @@ Key findings:
         const filename = customDataItem.path.split('/').pop() || name;
         
         // Call backend to delete the file
-        const response = await fetch(`http://localhost:8000/api/data/${filename}`, {
+        const response = await fetch(`http://18.212.99.49/api/data/${filename}`, {
           method: 'DELETE',
         });
 
