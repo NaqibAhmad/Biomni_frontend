@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import { biomniAPI } from '@/lib/api';
+import ProxyTest from '@/components/ProxyTest';
 
 const quickActions = [
   {
@@ -307,6 +308,17 @@ export function Dashboard() {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Proxy Test */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Proxy Connection Test</h3>
+          <p className="card-description">Test the HTTPS proxy connection to your EC2 backend</p>
+        </div>
+        <div className="card-content">
+          <ProxyTest />
         </div>
       </div>
 
