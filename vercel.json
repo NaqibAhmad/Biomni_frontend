@@ -1,28 +1,10 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" },
-    { 
-      "source": "/api/(.*)", 
-      "destination": "http://18.212.99.49/api/$1" 
-    }
+    { "source": "/(.*)", "destination": "/" }
   ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, ngrok-skip-browser-warning"
-        }
-      ]
+  "functions": {
+    "api/proxy/[...path].js": {
+      "maxDuration": 300
     }
-  ]
+  }
 }
