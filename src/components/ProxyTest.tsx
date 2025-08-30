@@ -28,7 +28,7 @@ const ProxyTest: React.FC = () => {
     setResult(null);
 
     try {
-      const api = new BiomniAPI('http://18.212.99.49');
+      const api = new BiomniAPI('https://api.mybioai.net');
       const response = await api.healthCheck();
       setResult(response);
       setStatus('success');

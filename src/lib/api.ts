@@ -20,6 +20,8 @@ import {
   SystemPrompt,
   ToolRegistry,
   RetrieverResult,
+  WebSocketConfig,
+  BackendWebSocketMessage,
 } from '@/types/biomni';
 
 // Backend response types that match the actual API
@@ -65,7 +67,8 @@ class BiomniAPI {
     const isProduction = window.location.hostname.includes('vercel.app');
     const defaultUrl = isProduction 
       ? '/api/proxy'  // Use Vercel proxy route for production
-      : 'http://18.212.99.49'  // Direct connection for local development
+      // : 'https://allowing-ultimately-roughy.ngrok-free.app'
+      : 'https://api.mybioai.net'
     
     this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || defaultUrl;
     
@@ -556,6 +559,123 @@ class BiomniAPI {
       };
     } catch (error) {
       throw this.handleError(error, 'Failed to delete session');
+    }
+  }
+
+  // WebSocket Streaming
+  createWebSocketConnection(config: WebSocketConfig): WebSocket {
+    // Determine WebSocket URL based on environment
+    const isProduction = window.location.hostname.includes('vercel.app');
+    const wsBaseURL = isProduction 
+      ? window.location.origin.replace('https://', 'wss://').replace('http://', 'ws://')
+      : 'ws://18.212.99.49'
+    
+    const wsURL = `${wsBaseURL}/api/chat/stream/${config.sessionId}`;
+    
+    const ws = new WebSocket(wsURL);
+
+    const connectionTimeout = setTimeout(() => {
+      ws.close();
+      if (config.onError) {
+        config.onError({
+          type: 'error',
+          data: {
+            message: 'WebSocket connection timed out after 10 seconds',
+            code: 'TIMEOUT'
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    }, 10000);
+
+    ws.onopen = () => {
+      clearTimeout(connectionTimeout);
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const message: BackendWebSocketMessage = JSON.parse(event.data);
+        
+        // Handle backend message format - always log the output
+        if (config.onLog) {
+          config.onLog({
+            type: 'log',
+            data: {
+              message: message.output,
+              level: 'info'
+            },
+            timestamp: message.timestamp
+          });
+        }
+        
+        // Only trigger completion if the backend explicitly says it's complete
+        if (message.is_complete === true && config.onComplete) {
+          config.onComplete({
+            type: 'complete',
+            data: {
+              session_id: message.session_id,
+              total_logs: message.step,
+              final_output: message.output
+            },
+            timestamp: message.timestamp
+          });
+        }
+      } catch (error) {
+        if (config.onError) {
+          config.onError({
+            type: 'error',
+            data: {
+              message: 'Failed to parse WebSocket message',
+              code: 'PARSE_ERROR'
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    };
+    
+    ws.onerror = () => {
+      clearTimeout(connectionTimeout);
+      if (config.onError) {
+        config.onError({
+          type: 'error',
+          data: {
+            message: 'WebSocket connection error',
+            code: 'CONNECTION_ERROR'
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    };
+    
+    ws.onclose = () => {
+      clearTimeout(connectionTimeout);
+      if (config.onClose) {
+        config.onClose();
+      }
+    };
+    
+    return ws;
+  }
+
+  // Send message through WebSocket
+  sendWebSocketMessage(ws: WebSocket, message: AgentQueryRequest): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      const payload = {
+        message: message.prompt,
+        self_critic: message.self_critic || false,
+        use_tool_retriever: true
+      };
+      ws.send(JSON.stringify(payload));
+    } else {
+      throw new Error('WebSocket is not open');
+    }
+  }
+
+  // Close WebSocket connection
+  closeWebSocketConnection(ws: WebSocket): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1000, 'Connection closed by client');
     }
   }
 

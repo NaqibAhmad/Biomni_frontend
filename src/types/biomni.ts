@@ -185,6 +185,7 @@ export interface ChatMessage {
     title?: string;
     log?: string;
     status?: 'pending' | 'success' | 'error';
+    isSolution?: boolean;
   };
 }
 
@@ -229,4 +230,64 @@ export interface ConfigFormData {
   base_url?: string;
   api_key?: string;
   source?: string;
+}
+
+// WebSocket Types
+export interface WebSocketConfig {
+  sessionId: string;
+  onLog?: (logMessage: StreamLogMessage) => void;
+  onOutput?: (outputMessage: StreamOutputMessage) => void;
+  onError?: (errorMessage: StreamErrorMessage) => void;
+  onComplete?: (completeMessage: StreamCompleteMessage) => void;
+  onClose?: () => void;
+}
+
+export interface WebSocketMessage {
+  type: 'log' | 'output' | 'error' | 'complete';
+  data: any;
+  timestamp: string;
+}
+
+export interface BackendWebSocketMessage {
+  session_id: string;
+  output: string;
+  step: number;
+  is_complete: boolean;
+  timestamp: string;
+}
+
+export interface StreamLogMessage {
+  type: 'log';
+  data: {
+    message: string;
+    level: string;
+  };
+  timestamp: string;
+}
+
+export interface StreamOutputMessage {
+  type: 'output';
+  data: {
+    content: string;
+  };
+  timestamp: string;
+}
+
+export interface StreamErrorMessage {
+  type: 'error';
+  data: {
+    message: string;
+    code: string;
+  };
+  timestamp: string;
+}
+
+export interface StreamCompleteMessage {
+  type: 'complete';
+  data: {
+    session_id: string;
+    total_logs: number;
+    final_output: string;
+  };
+  timestamp: string;
 }

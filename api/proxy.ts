@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
 
-const EC2_BASE_URL = 'http://18.212.99.49';
+const EC2_BASE_URL = 'https://api.mybioai.net';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS

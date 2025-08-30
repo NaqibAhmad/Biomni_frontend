@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Copy, Download, RefreshCw, Upload, Database, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Send, Bot, User, Loader2, Copy, Download, RefreshCw, Upload, Database, ThumbsUp, ThumbsDown, Wifi, WifiOff, CheckCircle, Award, Lightbulb, FileText } from 'lucide-react';
 import { useAgentStore } from '@/store/agentStore';
 import { ChatMessage } from '@/types/biomni';
 import { formatRelativeTime, copyToClipboard, downloadFile } from '@/lib/utils';
@@ -18,18 +18,30 @@ export function ChatPanel() {
     clearMessages,
     isInitialized,
     initializeAgent,
+    addMessage,
+    // WebSocket state from store
+    isConnected,
+    isStreaming,
+    streamingLogs,
+    connect,
+    disconnect,
+    sendWebSocketMessage,
+    clearStreamingLogs,
   } = useAgentStore();
 
   const [input, setInput] = useState('');
   const [isInitializing, setIsInitializing] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isUsingStreaming, setIsUsingStreaming] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const isUpdatingMessagesRef = useRef(false);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages.length, streamingLogs.length]);
 
   // Auto-focus input when not processing
   useEffect(() => {
@@ -45,6 +57,91 @@ export function ChatPanel() {
     }
   }, [isInitialized, isInitializing]);
 
+  // Initialize session on component mount
+  useEffect(() => {
+    if (isInitialized && !currentSessionId) {
+      setCurrentSessionId('329cb31d-3533-4772-b869-bc100a49bcb9');
+    }
+  }, [isInitialized, currentSessionId]);
+
+  // Initialize WebSocket connection when session is available
+  useEffect(() => {
+    if (isInitialized && currentSessionId && isUsingStreaming && !isConnected) {
+      connect(currentSessionId);
+    }
+  }, [isInitialized, currentSessionId, isUsingStreaming, isConnected, connect]);
+
+  // Show streaming status in assistant message
+  useEffect(() => {
+    if (isStreaming && !isUpdatingMessagesRef.current) {
+      const currentMessages = useAgentStore.getState().messages;
+      if (currentMessages.length > 0) {
+        const lastMessage = currentMessages[currentMessages.length - 1];
+        if (lastMessage.role === 'assistant' && lastMessage.metadata?.status === 'pending') {
+          isUpdatingMessagesRef.current = true;
+          const logCount = streamingLogs.length;
+          const updatedMessages = currentMessages.map((msg, index) =>
+            index === currentMessages.length - 1
+              ? { ...msg, content: `Processing your request... (${logCount} logs received)`, metadata: { ...msg.metadata, status: 'pending' as const } }
+              : msg
+          );
+          useAgentStore.setState({ messages: updatedMessages });
+          setTimeout(() => { isUpdatingMessagesRef.current = false; }, 50);
+        }
+      }
+    }
+  }, [isStreaming, streamingLogs.length]);
+
+  // Handle streaming completion
+  useEffect(() => {
+    if (!isStreaming && streamingLogs.length > 0 && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant' && lastMessage.metadata?.status === 'pending') {
+        
+        const allLogs = streamingLogs.join('\n');
+        const solutionMatch = allLogs.match(/<solution>([\s\S]*?)<\/solution>/);
+        
+        let finalOutput = '';
+        let isSolution = false;
+
+        if (solutionMatch && solutionMatch[1]) {
+          // Clean up the solution content
+          finalOutput = solutionMatch[1]
+            .trim()
+            .replace(/^#+\s*/gm, '## ') // Normalize headers
+            .replace(/\*\*(.*?)\*\*/g, '**$1**') // Ensure bold formatting
+            .replace(/^\s*-\s+/gm, '- ') // Normalize bullet points
+            .replace(/\n\s*\n\s*\n/g, '\n\n'); // Clean up multiple newlines
+          isSolution = true;
+        } else {
+          // Fallback if <solution> tag is not found
+          const solutionLog = streamingLogs.find((log: string) =>
+            log.toLowerCase().includes('solution') ||
+            log.toLowerCase().includes('answer') ||
+            log.toLowerCase().includes('conclusion') ||
+            log.toLowerCase().includes('final')
+          );
+          finalOutput = solutionLog || streamingLogs[streamingLogs.length - 1];
+        }
+
+        const updatedMessages = messages.map((msg) =>
+          msg.id === lastMessage.id
+            ? { 
+                ...msg, 
+                content: finalOutput, 
+                metadata: { 
+                  ...msg.metadata, 
+                  status: 'success' as const,
+                  isSolution, // Add a flag to identify the solution message
+                } 
+              }
+            : msg
+        );
+        useAgentStore.setState({ messages: updatedMessages });
+      }
+    }
+  }, [isStreaming, streamingLogs, messages]);
+
   const handleInitialize = async () => {
     setIsInitializing(true);
     try {
@@ -57,7 +154,6 @@ export function ChatPanel() {
       toast.success('Agent initialized successfully!');
     } catch (error) {
       toast.error('Failed to initialize agent');
-      console.error('Initialization error:', error);
     } finally {
       setIsInitializing(false);
     }
@@ -65,19 +161,45 @@ export function ChatPanel() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isProcessing || !isInitialized) return;
+    if (!input.trim() || !isInitialized) return;
 
-    try {
+    if (isUsingStreaming && isStreaming) return;
+    if (!isUsingStreaming && isProcessing) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date(),
+    };
+    addMessage(userMessage);
+
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: 'Processing your request...',
+      timestamp: new Date(),
+      metadata: { status: 'pending' as const },
+    };
+    addMessage(assistantMessage);
+
+    if (isUsingStreaming && isConnected) {
+      clearStreamingLogs();
+      sendWebSocketMessage({
+        prompt: input.trim(),
+        self_critic: false,
+        test_time_scale_round: 0,
+      });
+    } else if (isUsingStreaming && !isConnected) {
+        toast.error('WebSocket not connected. Please check connection or disable streaming.');
+    } else {
       await queryAgent({
         prompt: input.trim(),
         self_critic: false,
         test_time_scale_round: 0,
       });
-      setInput('');
-    } catch (error) {
-      toast.error('Failed to send message');
-      console.error('Query error:', error);
     }
+    setInput('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -85,6 +207,18 @@ export function ChatPanel() {
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+  
+  const toggleStreaming = () => {
+    setIsUsingStreaming(prev => {
+      const newStreamingState = !prev;
+      if (newStreamingState && currentSessionId) {
+        connect(currentSessionId);
+      } else {
+        disconnect();
+      }
+      return newStreamingState;
+    });
   };
 
   const handleCopyMessage = async (content: string) => {
@@ -114,6 +248,134 @@ export function ChatPanel() {
     const isUser = message.role === 'user';
     const isPending = message.metadata?.status === 'pending';
     const isError = message.metadata?.status === 'error';
+    const isSolution = message.metadata?.isSolution;
+
+    if (isSolution) {
+      return (
+        <div key={message.id} className="p-6 bg-gradient-to-br from-green-50 via-emerald-50 to-blue-50 border-b border-green-200">
+          <div className="flex gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
+                <Award className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-900">Biomni Research Assistant</span>
+                  <div className="bg-green-100 px-2 py-1 rounded-full">
+                    <span className="text-xs font-medium text-green-700">Solution Ready</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">{formatRelativeTime(message.timestamp)}</span>
+                  <button
+                    onClick={() => handleCopyMessage(message.content)}
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Copy solution"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-white border border-green-200 rounded-xl shadow-lg overflow-hidden">
+                {/* Solution Header */}
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <Lightbulb className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Research Solution</h3>
+                      <p className="text-green-100 text-sm">Analysis complete with key findings</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Solution Content */}
+                <div className="p-6">
+                  <div className="prose prose-lg max-w-none text-gray-800">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => (
+                          <h1 className="text-2xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-xl font-semibold text-gray-800 mb-3 mt-6 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-green-600" />
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-lg font-medium text-gray-800 mb-2 mt-4">
+                            {children}
+                          </h3>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="space-y-2 my-4">
+                            {children}
+                          </ul>
+                        ),
+                        li: ({ children }) => (
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{children}</span>
+                          </li>
+                        ),
+                        p: ({ children }) => (
+                          <p className="mb-4 leading-relaxed text-gray-700">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-gray-900">
+                            {children}
+                          </strong>
+                        ),
+                        code: ({ children }) => (
+                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800">
+                            {children}
+                          </code>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+                
+                {/* Solution Footer */}
+                <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Research analysis completed successfully</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                        title="Helpful solution"
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Not helpful"
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -130,11 +392,7 @@ export function ChatPanel() {
                 : 'bg-secondary-100 text-secondary-600'
             }`}
           >
-            {isUser ? (
-              <User className="w-4 h-4" />
-            ) : (
-              <Bot className="w-4 h-4" />
-            )}
+            {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
           </div>
         </div>
 
@@ -249,6 +507,30 @@ export function ChatPanel() {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* WebSocket Connection Status */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs">
+            {isConnected ? (
+              <div className="flex items-center gap-1 text-green-600">
+                <Wifi className="w-3 h-3" />
+                <span>Connected</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-red-600">
+                <WifiOff className="w-3 h-3" />
+                <span>Disconnected</span>
+              </div>
+            )}
+          </div>
+
+          {/* Streaming Toggle */}
+          <button
+            onClick={toggleStreaming}
+            className={`btn btn-sm ${isUsingStreaming ? 'btn-primary' : 'btn-outline'}`}
+            title={isUsingStreaming ? 'Disable streaming' : 'Enable streaming'}
+          >
+            {isUsingStreaming ? 'Streaming ON' : 'Streaming OFF'}
+          </button>
+          
           <button
             onClick={() => setIsUploadModalOpen(true)}
             disabled={!isInitialized}

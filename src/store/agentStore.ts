@@ -14,7 +14,13 @@ import {
   CustomData,
   CustomSoftware,
   ResearchSession,
+  WebSocketConfig,
+  StreamLogMessage,
+  StreamErrorMessage,
 } from '@/types/biomni';
+
+// Keep a reference to the WebSocket outside the store
+let ws: WebSocket | null = null;
 
 interface ExecutorLog {
   id: string;
@@ -69,18 +75,30 @@ interface AgentState {
   isLoadingSoftware: boolean;
   isLoadingConfig: boolean;
 
-      // Actions
-    initializeAgent: (config: AgentInitRequest) => Promise<void>;
-    queryAgent: (request: AgentQueryRequest) => Promise<void>;
-    addMessage: (message: ChatMessage) => void;
-    clearMessages: () => void;
-    setError: (error?: string) => void;
-    setProcessing: (processing: boolean) => void;
-    setCurrentTask: (task?: string) => void;
-    
-    // Executor log actions
-    addExecutorLog: (log: ExecutorLog) => void;
-    clearExecutorLogs: () => void;
+  // WebSocket State
+  isConnected: boolean;
+  isStreaming: boolean;
+  streamingLogs: string[];
+  streamingError?: string;
+
+  // Actions
+  initializeAgent: (config: AgentInitRequest) => Promise<void>;
+  queryAgent: (request: AgentQueryRequest) => Promise<void>;
+  addMessage: (message: ChatMessage) => void;
+  clearMessages: () => void;
+  setError: (error?: string) => void;
+  setProcessing: (processing: boolean) => void;
+  setCurrentTask: (task?: string) => void;
+  
+  // WebSocket management
+  connect: (sessionId: string) => void;
+  disconnect: () => void;
+  sendWebSocketMessage: (message: AgentQueryRequest) => void;
+  clearStreamingLogs: () => void;
+  
+  // Executor log actions
+  addExecutorLog: (log: ExecutorLog) => void;
+  clearExecutorLogs: () => void;
   
   // Resource management
   loadTools: () => Promise<void>;
@@ -122,6 +140,12 @@ export const useAgentStore = create<AgentState>()(
     isLoadingSoftware: false,
     isLoadingConfig: false,
 
+    // WebSocket initial state
+    isConnected: false,
+    isStreaming: false,
+    streamingLogs: [],
+    streamingError: undefined,
+
     // Agent initialization
     initializeAgent: async (config: AgentInitRequest) => {
       try {
@@ -155,12 +179,12 @@ export const useAgentStore = create<AgentState>()(
       }
     },
 
-    // Agent querying
+    // Agent querying (this will be refactored out in favor of ChatPanel logic)
     queryAgent: async (request: AgentQueryRequest) => {
+      // This will be deprecated by the streaming implementation in ChatPanel
+      // but is kept for non-streaming mode.
       try {
         set({ isProcessing: true, error: undefined });
-        
-        // Add user message
         const userMessage: ChatMessage = {
           id: Date.now().toString(),
           role: 'user',
@@ -169,292 +193,35 @@ export const useAgentStore = create<AgentState>()(
         };
         get().addMessage(userMessage);
 
-        // Add processing message
-        const processingMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Processing your request...',
-          timestamp: new Date(),
-          metadata: {
-            status: 'pending',
-          },
-        };
-        get().addMessage(processingMessage);
-
-        // Add professional executor logs to simulate backend execution
-        const taskLog: ExecutorLog = {
-          id: Date.now().toString(),
-          type: 'task',
-          title: 'New task launched',
-          status: 'running',
-          content: `Task: ${request.prompt.substring(0, 50)}${request.prompt.length > 50 ? '...' : ''}`,
-          timestamp: new Date(),
-          stepNumber: 1,
-        };
-        get().addExecutorLog(taskLog);
-
-        // Add resource retrieval log
-        setTimeout(() => {
-          const resourceLog: ExecutorLog = {
-            id: (Date.now() + 1).toString(),
-            type: 'resource',
-            title: 'Retrieving resources...',
-            status: 'completed',
-            content: 'Loading relevant tools and data sources for biomedical analysis',
-            timestamp: new Date(),
-            stepNumber: 2,
-          };
-          get().addExecutorLog(resourceLog);
-
-          // Add planning log
-          const planningLog: ExecutorLog = {
-            id: (Date.now() + 2).toString(),
-            type: 'planning',
-            title: 'Planning the next step...',
-            status: 'running',
-            content: 'Analyzing the request and determining the best approach...',
-            timestamp: new Date(),
-            stepNumber: 3,
-          };
-          get().addExecutorLog(planningLog);
-        }, 800);
-
-        // Simulate planning completion and reasoning
-        setTimeout(() => {
-          const planningComplete: ExecutorLog = {
-            id: (Date.now() + 3).toString(),
-            type: 'planning',
-            title: 'Planning completed',
-            status: 'completed',
-            content: 'Plan created: Load data, analyze patterns, generate insights',
-            timestamp: new Date(),
-            stepNumber: 3,
-            duration: '2.1s',
-          };
-          get().addExecutorLog(planningComplete);
-
-          // Add reasoning log with detailed plan
-          const reasoningLog: ExecutorLog = {
-            id: (Date.now() + 4).toString(),
-            type: 'reasoning',
-            title: 'Reasoning...',
-            status: 'running',
-            content: `I'll analyze the experimental data to compare the Ang-1-5/Ang II ratio with the Ang-1-9/Ang I ratio for predicting ACE2 activity under different lisinopril conditions.
-
-Plan:
-1. Load and examine the Excel file structure [ ] (pending)
-2. Clean and prepare the data for analysis [ ] (pending)
-3. Calculate the target ratios (Ang-1-5/Ang II and Ang-1-9/Ang I) [ ] (pending)
-4. Analyze ACE2 activity levels and lisinopril conditions [ ] (pending)
-5. Compare predictive performance of both ratios [ ] (pending)
-6. Create visualizations showing relationships [ ] (pending)
-7. Perform statistical analysis and significance testing [ ] (pending)
-8. Generate comprehensive summary and recommendations [ ] (pending)
-
-Let me start by examining the unloaded data:`,
-            timestamp: new Date(),
-            stepNumber: 4,
-            details: { type: 'list' },
-          };
-          get().addExecutorLog(reasoningLog);
-        }, 2000);
-
         const response = await biomniAPI.queryAgent(request);
         
         if (response.success && response.data) {
-          // Update reasoning log to show progress
-          setTimeout(() => {
-            const reasoningUpdate: ExecutorLog = {
-              id: (Date.now() + 5).toString(),
-              type: 'reasoning',
-              title: 'Reasoning...',
-              status: 'completed',
-              content: `I'll analyze the experimental data to compare the Ang-1-5/Ang II ratio with the Ang-1-9/Ang I ratio for predicting ACE2 activity under different lisinopril conditions.
-
-Plan:
-1. Load and examine the Excel file structure [✔] (completed)
-2. Clean and prepare the data for analysis [✔] (completed)
-3. Calculate the target ratios (Ang-1-5/Ang II and Ang-1-9/Ang I) [✔] (completed)
-4. Analyze ACE2 activity levels and lisinopril conditions [✔] (completed)
-5. Compare predictive performance of both ratios [✔] (completed)
-6. Create visualizations showing relationships [✔] (completed)
-7. Perform statistical analysis and significance testing [✔] (completed)
-8. Generate comprehensive summary and recommendations [✔] (completed)
-
-Perfect! I can see the data structure clearly now. Let me clean the data and set up proper column headers:`,
-              timestamp: new Date(),
-              stepNumber: 4,
-              duration: '3.2s',
-              details: { type: 'list' },
-            };
-            get().addExecutorLog(reasoningUpdate);
-          }, 3000);
-
-          // Add code execution log
-          setTimeout(() => {
-            const codeLog: ExecutorLog = {
-              id: (Date.now() + 6).toString(),
-              type: 'code',
-              title: 'Executing code...',
-              status: 'running',
-              content: 'Running Python code to process the data...',
-              timestamp: new Date(),
-              stepNumber: 5,
-            };
-            get().addExecutorLog(codeLog);
-
-            // Simulate code completion
-            setTimeout(() => {
-              const codeComplete: ExecutorLog = {
-                id: (Date.now() + 7).toString(),
-                type: 'code',
-                title: 'Code execution completed',
-                status: 'completed',
-                content: 'Code execution completed in 5.40s (5.4s)',
-                timestamp: new Date(),
-                stepNumber: 5,
-                duration: '5.4s',
-              };
-              get().addExecutorLog(codeComplete);
-
-                             // Add observation log with detailed data
-               setTimeout(() => {
-                 const observationLog: ExecutorLog = {
-                   id: (Date.now() + 8).toString(),
-                   type: 'observation',
-                   title: 'Observation',
-                   status: 'completed',
-                   content: `Observation from code execution
-
-Cleaned dataset shape: (72, 30)
-
-Key columns identified:
-- rhRenin [pg/ml]
-- Lisinopril [µM]
-- rhACE2 [nM]
-- Treatment
-- Ang II [pg/ml]
-- Ang 1-7 [pg/ml]
-- Ang 1-9 [pg/ml]
-- Ang I [pg/ml]
-
-Looking for relevant columns:
-Found Ang II related: 6 mentions
-Found Ang 1-5 related: 9 mentions
-Found Ang 1-9 related: 5 mentions
-Found Ang I related: 3 mentions
-
-Sample mentions:
-Ang II: ['Ang II (1-8)', 'Ang III (2-8)', 'Ang 2-7']
-Ang 1-5: ['Ang 1-5', 'Ang 1-5/Ang 1-7', 'Ang 1-7 + Ang 1-5']
-Ang 1-9: ['Ang 1-9', 'Ang 1-9 + Ang 1-7 + Ang 1-5', 'Relative Alternative RAS Activation 1 (Ang 1-9+Ang 1-7+Ang 1-5)/ALL ANG']`,
-                   timestamp: new Date(),
-                   stepNumber: 6,
-                 };
-                 get().addExecutorLog(observationLog);
-
-                 // Add visualization log with scientific plots
-                 setTimeout(() => {
-                   const visualizationLog: ExecutorLog = {
-                     id: (Date.now() + 9).toString(),
-                     type: 'visualization',
-                     title: 'Visualization',
-                     status: 'completed',
-                     content: `Generated scientific visualizations for predictive performance analysis:
-
-1. Scatter Plot: Ang 1-5/Ang II vs ACE2 Activity (R² = 0.328)
-2. Scatter Plot: (Ang 1-5 + Ang 1-7)/Ang II vs ACE2 Activity (R² = 0.411)
-3. Bar Chart: Predictive Performance Comparison
-4. Scatter Plot: Ang 1-5 vs ACE2 Activity (R² = 0.034)
-
-Key findings:
-- Ang 1-5/Ang II ratio shows moderate correlation (R² = 0.328)
-- Combined ratio (Ang 1-5 + Ang 1-7)/Ang II shows strongest correlation (R² = 0.411)
-- Ang 1-5 alone shows weak correlation (R² = 0.034)
-- Spearman correlations confirm rank-order relationships`,
-                     timestamp: new Date(),
-                     stepNumber: 7,
-                     details: { type: 'visualization' },
-                     visualizations: [
-                       {
-                         id: 'viz1',
-                         title: 'Ang 1-5/Ang II vs ACE2 Activity',
-                         type: 'scatter',
-                         data: { r2: 0.328, correlation: 0.572 }
-                       },
-                       {
-                         id: 'viz2',
-                         title: '(Ang 1-5 + Ang 1-7)/Ang II vs ACE2 Activity',
-                         type: 'scatter',
-                         data: { r2: 0.411, correlation: 0.641 }
-                       },
-                       {
-                         id: 'viz3',
-                         title: 'Predictive Performance Comparison',
-                         type: 'bar',
-                         data: {
-                           metrics: ['R² Score', 'Pearson r', 'Spearman r'],
-                           values: {
-                             'Ang 1-5': [0.034, 0.184, 0.167],
-                             'Ang 1-5/Ang II': [0.328, 0.572, 0.78],
-                             '(Ang 1-5 + Ang 1-7)/Ang II': [0.411, 0.641, 0.8]
-                           }
-                         }
-                       },
-                       {
-                         id: 'viz4',
-                         title: 'Ang 1-5 vs ACE2 Activity',
-                         type: 'scatter',
-                         data: { r2: 0.034, correlation: 0.184 }
-                       }
-                     ]
-                   };
-                   get().addExecutorLog(visualizationLog);
-                 }, 1500);
-               }, 1000);
-            }, 3000);
-          }, 1000);
-
-          // Update processing message with actual response
           const assistantMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
+            id: Date.now().toString(),
             role: 'assistant',
             content: response.data.content,
             timestamp: new Date(),
             metadata: {
               status: 'success',
+              log: response.data.log.join('\n'),
             },
           };
-          
-          set((state) => ({
-            messages: state.messages.map((msg) =>
-              msg.id === processingMessage.id ? assistantMessage : msg
-            ),
-            isProcessing: false,
-          }));
+          get().addMessage(assistantMessage);
         } else {
-          throw new Error(response.error || 'Failed to get response from agent');
+          throw new Error(response.error || 'Failed to query agent');
         }
       } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Unknown error occurred',
-          isProcessing: false,
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        set({ error: errorMessage });
+        get().addMessage({
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `An error occurred: ${errorMessage}`,
+          timestamp: new Date(),
+          metadata: { status: 'error' },
         });
-        
-        // Update processing message with error
-        set((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.metadata?.status === 'pending'
-              ? {
-                  ...msg,
-                  content: 'An error occurred while processing your request.',
-                  metadata: { ...msg.metadata, status: 'error' as const },
-                }
-              : msg
-          ),
-        }));
-        
-        throw error;
+      } finally {
+        set({ isProcessing: false });
       }
     },
 
@@ -479,6 +246,71 @@ Key findings:
 
     setCurrentTask: (task?: string) => {
       set({ currentTask: task });
+    },
+
+    // WebSocket management
+    connect: (sessionId: string) => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        return;
+      }
+      
+      get().clearStreamingLogs();
+      set({ isStreaming: false, streamingError: undefined });
+
+      const config: WebSocketConfig = {
+        sessionId,
+        onLog: (logMessage: StreamLogMessage) => {
+          set(state => ({
+            streamingLogs: [...state.streamingLogs, logMessage.data.message],
+            isStreaming: true,
+          }));
+        },
+        onError: (errorMessage: StreamErrorMessage) => {
+          set({ streamingError: errorMessage.data.message, isStreaming: false });
+        },
+        onComplete: () => {
+          setTimeout(() => set({ isStreaming: false }), 100);
+        },
+        onClose: () => {
+          set({ isConnected: false, isStreaming: false });
+        },
+      };
+
+      try {
+        ws = biomniAPI.createWebSocketConnection(config);
+        set({ isConnected: true });
+      } catch (err) {
+        set({
+          streamingError: err instanceof Error ? err.message : 'Failed to connect to WebSocket',
+          isConnected: false,
+        });
+      }
+    },
+
+    disconnect: () => {
+      if (ws) {
+        biomniAPI.closeWebSocketConnection(ws);
+        ws = null;
+      }
+      set({ isConnected: false, isStreaming: false });
+    },
+
+    sendWebSocketMessage: (message: AgentQueryRequest) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        set({ streamingError: 'WebSocket is not connected' });
+        return;
+      }
+
+      try {
+        biomniAPI.sendWebSocketMessage(ws, message);
+        set({ streamingError: undefined });
+      } catch (err) {
+        set({ streamingError: err instanceof Error ? err.message : 'Failed to send message' });
+      }
+    },
+
+    clearStreamingLogs: () => {
+      set({ streamingLogs: [] });
     },
 
     // Executor log management
@@ -678,7 +510,7 @@ Key findings:
         const filename = customDataItem.path.split('/').pop() || name;
         
         // Call backend to delete the file
-        const response = await fetch(`http://18.212.99.49/api/data/${filename}`, {
+        const response = await fetch(`https://api.mybioai.net/api/data/${filename}`, {
           method: 'DELETE',
         });
 
