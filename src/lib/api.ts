@@ -565,12 +565,19 @@ class BiomniAPI {
   // WebSocket Streaming
   createWebSocketConnection(config: WebSocketConfig): WebSocket {
     // Determine WebSocket URL based on environment
-    const isProduction = window.location.hostname.includes('vercel.app');
+    const isProduction = window.location.protocol === 'https:' || 
+                        window.location.hostname.includes('vercel.app') || 
+                        window.location.hostname.includes('mybioai.net') ||
+                        window.location.hostname !== 'localhost';
+    
     const wsBaseURL = isProduction 
-      ? window.location.origin.replace('https://', 'wss://').replace('http://', 'ws://')
-      : 'ws://18.212.99.49'
+      ? 'wss://api.mybioai.net' // Use secure WebSocket for production API
+      : 'ws://18.212.99.49'     // Use insecure WebSocket for local development
     
     const wsURL = `${wsBaseURL}/api/chat/stream/${config.sessionId}`;
+    
+    // Log WebSocket connection details for debugging
+    console.log(`WebSocket connecting to: ${wsURL} (Production: ${isProduction})`);
     
     const ws = new WebSocket(wsURL);
 
