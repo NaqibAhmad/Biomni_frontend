@@ -82,7 +82,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
     // Validate descriptions
     const missingDescriptions = fileInfos.filter(info => !info.description.trim());
     if (missingDescriptions.length > 0) {
-      toast.error('Please provide descriptions for all files');
+      toast.error('Please provide descriptions for all filess');
       return;
     }
 
