@@ -67,7 +67,7 @@ class BiomniAPI {
     const isProduction = window.location.hostname.includes("vercel.app");
     const defaultUrl = isProduction
       ? "/api/proxy" // Use Vercel proxy route for production
-      : "https://allowing-ultimately-roughy.ngrok-free.app";
+      : "http://localhost:8000";
     // : 'https://api.mybioai.net'
 
     this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || defaultUrl;

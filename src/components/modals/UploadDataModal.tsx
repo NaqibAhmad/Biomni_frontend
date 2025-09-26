@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
-import { X, Upload, AlertCircle, Loader2 } from 'lucide-react';
-import { useAgentStore } from '@/store/agentStore';
-import toast from 'react-hot-toast';
+import { useState, useRef } from "react";
+import { X, Upload, AlertCircle, Loader2 } from "lucide-react";
+import { useAgentStore } from "@/store/agentStore";
+import toast from "react-hot-toast";
 
 interface UploadDataModalProps {
   isOpen: boolean;
@@ -26,12 +26,12 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     setSelectedFiles(files);
-    
-    const newFileInfos = files.map(file => ({
+
+    const newFileInfos = files.map((file) => ({
       name: file.name,
       size: file.size,
       type: file.type,
-      description: ''
+      description: "",
     }));
     setFileInfos(newFileInfos);
   };
@@ -50,39 +50,45 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const getFileIcon = (type: string) => {
-    if (type.includes('csv') || type.includes('excel') || type.includes('spreadsheet')) {
-      return '📊';
-    } else if (type.includes('json')) {
-      return '📄';
-    } else if (type.includes('text') || type.includes('txt')) {
-      return '📝';
-    } else if (type.includes('image')) {
-      return '🖼️';
-    } else if (type.includes('pdf')) {
-      return '📕';
+    if (
+      type.includes("csv") ||
+      type.includes("excel") ||
+      type.includes("spreadsheet")
+    ) {
+      return "📊";
+    } else if (type.includes("json")) {
+      return "📄";
+    } else if (type.includes("text") || type.includes("txt")) {
+      return "📝";
+    } else if (type.includes("image")) {
+      return "🖼️";
+    } else if (type.includes("pdf")) {
+      return "📕";
     } else {
-      return '📁';
+      return "📁";
     }
   };
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
-      toast.error('Please select at least one file to upload');
+      toast.error("Please select at least one file to upload");
       return;
     }
 
     // Validate descriptions
-    const missingDescriptions = fileInfos.filter(info => !info.description.trim());
+    const missingDescriptions = fileInfos.filter(
+      (info) => !info.description.trim()
+    );
     if (missingDescriptions.length > 0) {
-      toast.error('Please provide descriptions for all filess');
+      toast.error("Please provide descriptions for all filess");
       return;
     }
 
@@ -93,34 +99,40 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const fileInfo = fileInfos[i];
-        
+
         // Create FormData
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('description', fileInfo.description);
-        formData.append('name', file.name);
+        formData.append("file", file);
+        formData.append("description", fileInfo.description);
+        formData.append("name", file.name);
 
         // Upload file
-        const isProduction = window.location.hostname.includes('vercel.app');
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProduction 
-          ? 'https://api.mybioai.net'  // Vercel proxy route
-          : 'https://api.mybioai.net'  // Direct connection for local
+        const isProduction = window.location.hostname.includes("vercel.app");
+        const apiBaseUrl =
+          import.meta.env.VITE_API_BASE_URL ||
+          (isProduction
+            ? "https://api.mybioai.net" // Vercel proxy route
+            : "http:localhost:8000"); // Direct connection for local
+        console.log("Upload API Base URL:", apiBaseUrl);
+        console.log(
+          "Environment VITE_API_BASE_URL:",
+          import.meta.env.VITE_API_BASE_URL
         );
-        console.log('Upload API Base URL:', apiBaseUrl);
-        console.log('Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-        console.log('Is Production:', isProduction);
-        
+        console.log("Is Production:", isProduction);
+
         const response = await fetch(`${apiBaseUrl}/api/data/upload`, {
-          method: 'POST',
+          method: "POST",
           body: formData,
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}: ${response.statusText}`);
+          throw new Error(
+            `Failed to upload ${file.name}: ${response.statusText}`
+          );
         }
 
         const result = await response.json();
-        
+
         // Add to store
         await addCustomData({
           name: file.name,
@@ -128,20 +140,25 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
           path: result.path || file.name,
           size: file.size,
           type: file.type,
-          uploaded_at: new Date().toISOString()
+          uploaded_at: new Date().toISOString(),
         });
 
         // Update progress
         setUploadProgress(((i + 1) / selectedFiles.length) * 100);
       }
 
-      toast.success(`Successfully uploaded ${selectedFiles.length} file(s). You can now reference these datasets in your conversation!`);
+      toast.success(
+        `Successfully uploaded ${selectedFiles.length} file(s). You can now reference these datasets in your conversation!`
+      );
       onClose();
       resetForm();
-      
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Upload error:", error);
+      toast.error(
+        `Upload failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -153,7 +170,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
     setFileInfos([]);
     setUploadProgress(0);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -172,8 +189,12 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Upload Custom Data</h2>
-            <p className="text-sm text-gray-600">Add your datasets to the data lake</p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Upload Custom Data
+            </h2>
+            <p className="text-sm text-gray-600">
+              Add your datasets to the data lake
+            </p>
           </div>
           <button
             onClick={handleClose}
@@ -207,7 +228,8 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                   Click to select files or drag and drop
                 </p>
                 <p className="text-xs text-gray-500">
-                  Supported formats: CSV, JSON, TXT, Excel, FASTA, FASTQ, BAM, SAM, VCF, BED, GTF, GFF, etc.
+                  Supported formats: CSV, JSON, TXT, Excel, FASTA, FASTQ, BAM,
+                  SAM, VCF, BED, GTF, GFF, etc.
                 </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -231,11 +253,16 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                   <div key={index} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{getFileIcon(file.type)}</span>
+                        <span className="text-2xl">
+                          {getFileIcon(file.type)}
+                        </span>
                         <div>
-                          <p className="font-medium text-gray-900">{file.name}</p>
+                          <p className="font-medium text-gray-900">
+                            {file.name}
+                          </p>
                           <p className="text-sm text-gray-500">
-                            {formatFileSize(file.size)} • {file.type || 'Unknown type'}
+                            {formatFileSize(file.size)} •{" "}
+                            {file.type || "Unknown type"}
                           </p>
                         </div>
                       </div>
@@ -247,14 +274,16 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Description *
                       </label>
                       <textarea
-                        value={fileInfos[index]?.description || ''}
-                        onChange={(e) => updateFileDescription(index, e.target.value)}
+                        value={fileInfos[index]?.description || ""}
+                        onChange={(e) =>
+                          updateFileDescription(index, e.target.value)
+                        }
                         placeholder="Describe what this dataset contains..."
                         className="input w-full h-20 resize-none"
                         disabled={isUploading}
@@ -293,9 +322,16 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                 <p className="font-medium mb-1">Upload Guidelines:</p>
                 <ul className="space-y-1 text-xs">
                   <li>• Maximum file size: 100MB per file</li>
-                  <li>• Supported formats: CSV, JSON, TXT, Excel, FASTA, FASTQ, BAM, SAM, VCF, BED, GTF, GFF</li>
-                  <li>• Provide clear descriptions for better dataset discovery</li>
-                  <li>• Files will be stored securely and indexed for search</li>
+                  <li>
+                    • Supported formats: CSV, JSON, TXT, Excel, FASTA, FASTQ,
+                    BAM, SAM, VCF, BED, GTF, GFF
+                  </li>
+                  <li>
+                    • Provide clear descriptions for better dataset discovery
+                  </li>
+                  <li>
+                    • Files will be stored securely and indexed for search
+                  </li>
                 </ul>
               </div>
             </div>
