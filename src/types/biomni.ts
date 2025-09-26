@@ -1,4 +1,4 @@
-// Core Biomni types that mirror the backend structure
+// Core MyBioAI types that mirror the backend structure
 
 export interface BiomniConfig {
   path: string;
@@ -66,12 +66,12 @@ export interface AgentState {
 }
 
 export interface Message {
-  type: 'human' | 'ai';
+  type: "human" | "ai";
   content: string | MessageContent[];
 }
 
 export interface MessageContent {
-  type: 'text' | 'tool_use';
+  type: "text" | "tool_use";
   text?: string;
   name?: string;
   input?: Record<string, any>;
@@ -178,13 +178,13 @@ export interface MCPAddRequest {
 // UI State types
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   metadata?: {
     title?: string;
     log?: string;
-    status?: 'pending' | 'success' | 'error';
+    status?: "pending" | "success" | "error";
     isSolution?: boolean;
   };
 }
@@ -243,7 +243,7 @@ export interface WebSocketConfig {
 }
 
 export interface WebSocketMessage {
-  type: 'log' | 'output' | 'error' | 'complete';
+  type: "log" | "output" | "error" | "complete";
   data: any;
   timestamp: string;
 }
@@ -257,7 +257,7 @@ export interface BackendWebSocketMessage {
 }
 
 export interface StreamLogMessage {
-  type: 'log';
+  type: "log";
   data: {
     message: string;
     level: string;
@@ -266,7 +266,7 @@ export interface StreamLogMessage {
 }
 
 export interface StreamOutputMessage {
-  type: 'output';
+  type: "output";
   data: {
     content: string;
   };
@@ -274,7 +274,7 @@ export interface StreamOutputMessage {
 }
 
 export interface StreamErrorMessage {
-  type: 'error';
+  type: "error";
   data: {
     message: string;
     code: string;
@@ -283,7 +283,7 @@ export interface StreamErrorMessage {
 }
 
 export interface StreamCompleteMessage {
-  type: 'complete';
+  type: "complete";
   data: {
     session_id: string;
     total_logs: number;

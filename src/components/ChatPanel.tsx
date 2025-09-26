@@ -1,13 +1,31 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Copy, Download, RefreshCw, Upload, Database, ThumbsUp, ThumbsDown, Wifi, WifiOff, CheckCircle, Award, Lightbulb, FileText } from 'lucide-react';
-import { useAgentStore } from '@/store/agentStore';
-import { ChatMessage } from '@/types/biomni';
-import { formatRelativeTime, copyToClipboard, downloadFile } from '@/lib/utils';
-import toast from 'react-hot-toast';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { UploadDataModal } from '@/components/modals/UploadDataModal';
+import { useState, useRef, useEffect } from "react";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Copy,
+  Download,
+  RefreshCw,
+  Upload,
+  Database,
+  ThumbsUp,
+  ThumbsDown,
+  Wifi,
+  WifiOff,
+  CheckCircle,
+  Award,
+  Lightbulb,
+  FileText,
+} from "lucide-react";
+import { useAgentStore } from "@/store/agentStore";
+import { ChatMessage } from "@/types/biomni";
+import { formatRelativeTime, copyToClipboard, downloadFile } from "@/lib/utils";
+import toast from "react-hot-toast";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { UploadDataModal } from "@/components/modals/UploadDataModal";
 
 export function ChatPanel() {
   const {
@@ -29,7 +47,7 @@ export function ChatPanel() {
     clearStreamingLogs,
   } = useAgentStore();
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -40,7 +58,7 @@ export function ChatPanel() {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, streamingLogs.length]);
 
   // Auto-focus input when not processing
@@ -60,7 +78,7 @@ export function ChatPanel() {
   // Initialize session on component mount
   useEffect(() => {
     if (isInitialized && !currentSessionId) {
-      setCurrentSessionId('329cb31d-3533-4772-b869-bc100a49bcb9');
+      setCurrentSessionId("329cb31d-3533-4772-b869-bc100a49bcb9");
     }
   }, [isInitialized, currentSessionId]);
 
@@ -77,16 +95,25 @@ export function ChatPanel() {
       const currentMessages = useAgentStore.getState().messages;
       if (currentMessages.length > 0) {
         const lastMessage = currentMessages[currentMessages.length - 1];
-        if (lastMessage.role === 'assistant' && lastMessage.metadata?.status === 'pending') {
+        if (
+          lastMessage.role === "assistant" &&
+          lastMessage.metadata?.status === "pending"
+        ) {
           isUpdatingMessagesRef.current = true;
           const logCount = streamingLogs.length;
           const updatedMessages = currentMessages.map((msg, index) =>
             index === currentMessages.length - 1
-              ? { ...msg, content: `Processing your request... (${logCount} logs received)`, metadata: { ...msg.metadata, status: 'pending' as const } }
+              ? {
+                  ...msg,
+                  content: `Processing your request... (${logCount} logs received)`,
+                  metadata: { ...msg.metadata, status: "pending" as const },
+                }
               : msg
           );
           useAgentStore.setState({ messages: updatedMessages });
-          setTimeout(() => { isUpdatingMessagesRef.current = false; }, 50);
+          setTimeout(() => {
+            isUpdatingMessagesRef.current = false;
+          }, 50);
         }
       }
     }
@@ -96,44 +123,47 @@ export function ChatPanel() {
   useEffect(() => {
     if (!isStreaming && streamingLogs.length > 0 && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant' && lastMessage.metadata?.status === 'pending') {
-        
-        const allLogs = streamingLogs.join('\n');
+      if (
+        lastMessage.role === "assistant" &&
+        lastMessage.metadata?.status === "pending"
+      ) {
+        const allLogs = streamingLogs.join("\n");
         const solutionMatch = allLogs.match(/<solution>([\s\S]*?)<\/solution>/);
-        
-        let finalOutput = '';
+
+        let finalOutput = "";
         let isSolution = false;
 
         if (solutionMatch && solutionMatch[1]) {
           // Clean up the solution content
           finalOutput = solutionMatch[1]
             .trim()
-            .replace(/^#+\s*/gm, '## ') // Normalize headers
-            .replace(/\*\*(.*?)\*\*/g, '**$1**') // Ensure bold formatting
-            .replace(/^\s*-\s+/gm, '- ') // Normalize bullet points
-            .replace(/\n\s*\n\s*\n/g, '\n\n'); // Clean up multiple newlines
+            .replace(/^#+\s*/gm, "## ") // Normalize headers
+            .replace(/\*\*(.*?)\*\*/g, "**$1**") // Ensure bold formatting
+            .replace(/^\s*-\s+/gm, "- ") // Normalize bullet points
+            .replace(/\n\s*\n\s*\n/g, "\n\n"); // Clean up multiple newlines
           isSolution = true;
         } else {
           // Fallback if <solution> tag is not found
-          const solutionLog = streamingLogs.find((log: string) =>
-            log.toLowerCase().includes('solution') ||
-            log.toLowerCase().includes('answer') ||
-            log.toLowerCase().includes('conclusion') ||
-            log.toLowerCase().includes('final')
+          const solutionLog = streamingLogs.find(
+            (log: string) =>
+              log.toLowerCase().includes("solution") ||
+              log.toLowerCase().includes("answer") ||
+              log.toLowerCase().includes("conclusion") ||
+              log.toLowerCase().includes("final")
           );
           finalOutput = solutionLog || streamingLogs[streamingLogs.length - 1];
         }
 
         const updatedMessages = messages.map((msg) =>
           msg.id === lastMessage.id
-            ? { 
-                ...msg, 
-                content: finalOutput, 
-                metadata: { 
-                  ...msg.metadata, 
-                  status: 'success' as const,
+            ? {
+                ...msg,
+                content: finalOutput,
+                metadata: {
+                  ...msg.metadata,
+                  status: "success" as const,
                   isSolution, // Add a flag to identify the solution message
-                } 
+                },
               }
             : msg
         );
@@ -146,14 +176,14 @@ export function ChatPanel() {
     setIsInitializing(true);
     try {
       await initializeAgent({
-        path: './data',
-        llm: 'claude-sonnet-4-20250514',
+        path: "./data",
+        llm: "claude-sonnet-4-20250514",
         use_tool_retriever: true,
         timeout_seconds: 600,
       });
-      toast.success('Agent initialized successfully!');
+      toast.success("Agent initialized successfully!");
     } catch (error) {
-      toast.error('Failed to initialize agent');
+      toast.error("Failed to initialize agent");
     } finally {
       setIsInitializing(false);
     }
@@ -168,7 +198,7 @@ export function ChatPanel() {
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      role: 'user',
+      role: "user",
       content: input.trim(),
       timestamp: new Date(),
     };
@@ -176,10 +206,10 @@ export function ChatPanel() {
 
     const assistantMessage: ChatMessage = {
       id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: 'Processing your request...',
+      role: "assistant",
+      content: "Processing your request...",
       timestamp: new Date(),
-      metadata: { status: 'pending' as const },
+      metadata: { status: "pending" as const },
     };
     addMessage(assistantMessage);
 
@@ -191,7 +221,9 @@ export function ChatPanel() {
         test_time_scale_round: 0,
       });
     } else if (isUsingStreaming && !isConnected) {
-        toast.error('WebSocket not connected. Please check connection or disable streaming.');
+      toast.error(
+        "WebSocket not connected. Please check connection or disable streaming."
+      );
     } else {
       await queryAgent({
         prompt: input.trim(),
@@ -199,18 +231,18 @@ export function ChatPanel() {
         test_time_scale_round: 0,
       });
     }
-    setInput('');
+    setInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
   };
-  
+
   const toggleStreaming = () => {
-    setIsUsingStreaming(prev => {
+    setIsUsingStreaming((prev) => {
       const newStreamingState = !prev;
       if (newStreamingState && currentSessionId) {
         connect(currentSessionId);
@@ -224,35 +256,40 @@ export function ChatPanel() {
   const handleCopyMessage = async (content: string) => {
     try {
       await copyToClipboard(content);
-      toast.success('Message copied to clipboard');
+      toast.success("Message copied to clipboard");
     } catch (error) {
-      toast.error('Failed to copy message');
+      toast.error("Failed to copy message");
     }
   };
 
   const handleDownloadChat = () => {
     const chatContent = messages
-      .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-      .join('\n\n');
-    
-    downloadFile(chatContent, `biomni-chat-${Date.now()}.txt`);
-    toast.success('Chat downloaded');
+      .map(
+        (msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+      )
+      .join("\n\n");
+
+    downloadFile(chatContent, `mybioai-chat-${Date.now()}.txt`);
+    toast.success("Chat downloaded");
   };
 
   const handleClearChat = () => {
     clearMessages();
-    toast.success('Chat cleared');
+    toast.success("Chat cleared");
   };
 
   const renderMessage = (message: ChatMessage) => {
-    const isUser = message.role === 'user';
-    const isPending = message.metadata?.status === 'pending';
-    const isError = message.metadata?.status === 'error';
+    const isUser = message.role === "user";
+    const isPending = message.metadata?.status === "pending";
+    const isError = message.metadata?.status === "error";
     const isSolution = message.metadata?.isSolution;
 
     if (isSolution) {
       return (
-        <div key={message.id} className="p-6 bg-gradient-to-br from-green-50 via-emerald-50 to-blue-50 border-b border-green-200">
+        <div
+          key={message.id}
+          className="p-6 bg-gradient-to-br from-green-50 via-emerald-50 to-blue-50 border-b border-green-200"
+        >
           <div className="flex gap-4">
             <div className="flex-shrink-0">
               <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
@@ -262,13 +299,19 @@ export function ChatPanel() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-gray-900">Biomni Research Assistant</span>
+                  <span className="font-bold text-gray-900">
+                    MyBioAI Research Assistant
+                  </span>
                   <div className="bg-green-100 px-2 py-1 rounded-full">
-                    <span className="text-xs font-medium text-green-700">Solution Ready</span>
+                    <span className="text-xs font-medium text-green-700">
+                      Solution Ready
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">{formatRelativeTime(message.timestamp)}</span>
+                  <span className="text-sm text-gray-500">
+                    {formatRelativeTime(message.timestamp)}
+                  </span>
                   <button
                     onClick={() => handleCopyMessage(message.content)}
                     className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
@@ -278,7 +321,7 @@ export function ChatPanel() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="bg-white border border-green-200 rounded-xl shadow-lg overflow-hidden">
                 {/* Solution Header */}
                 <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
@@ -287,12 +330,16 @@ export function ChatPanel() {
                       <Lightbulb className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">Research Solution</h3>
-                      <p className="text-green-100 text-sm">Analysis complete with key findings</p>
+                      <h3 className="text-xl font-bold text-white">
+                        Research Solution
+                      </h3>
+                      <p className="text-green-100 text-sm">
+                        Analysis complete with key findings
+                      </p>
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Solution Content */}
                 <div className="p-6">
                   <div className="prose prose-lg max-w-none text-gray-800">
@@ -315,9 +362,7 @@ export function ChatPanel() {
                           </h3>
                         ),
                         ul: ({ children }) => (
-                          <ul className="space-y-2 my-4">
-                            {children}
-                          </ul>
+                          <ul className="space-y-2 my-4">{children}</ul>
                         ),
                         li: ({ children }) => (
                           <li className="flex items-start gap-2">
@@ -346,7 +391,7 @@ export function ChatPanel() {
                     </ReactMarkdown>
                   </div>
                 </div>
-                
+
                 {/* Solution Footer */}
                 <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
@@ -381,18 +426,22 @@ export function ChatPanel() {
       <div
         key={message.id}
         className={`flex gap-4 p-4 ${
-          isUser ? 'bg-white' : 'bg-gray-50'
+          isUser ? "bg-white" : "bg-gray-50"
         } border-b border-gray-200`}
       >
         <div className="flex-shrink-0">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               isUser
-                ? 'bg-primary-100 text-primary-600'
-                : 'bg-secondary-100 text-secondary-600'
+                ? "bg-primary-100 text-primary-600"
+                : "bg-secondary-100 text-secondary-600"
             }`}
           >
-            {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+            {isUser ? (
+              <User className="w-4 h-4" />
+            ) : (
+              <Bot className="w-4 h-4" />
+            )}
           </div>
         </div>
 
@@ -400,13 +449,13 @@ export function ChatPanel() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-900">
-                {isUser ? 'You' : 'Biomni Assistant'}
+                {isUser ? "You" : "MyBioAI Assistant"}
               </span>
               <span className="text-sm text-gray-500">
                 {formatRelativeTime(message.timestamp)}
               </span>
             </div>
-            
+
             {!isUser && (
               <div className="flex items-center gap-1">
                 <button
@@ -446,7 +495,7 @@ export function ChatPanel() {
               <ReactMarkdown
                 components={{
                   code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || '');
+                    const match = /language-(\w+)/.exec(className || "");
                     return !inline && match ? (
                       <SyntaxHighlighter
                         style={tomorrow as any}
@@ -454,7 +503,7 @@ export function ChatPanel() {
                         PreTag="div"
                         {...props}
                       >
-                        {String(children).replace(/\n$/, '')}
+                        {String(children).replace(/\n$/, "")}
                       </SyntaxHighlighter>
                     ) : (
                       <code className={className} {...props}>
@@ -485,7 +534,7 @@ export function ChatPanel() {
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary-600" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Initializing Biomni Agent
+            Initializing MyBioAI Agent
           </h3>
           <p className="text-sm text-gray-600">
             Setting up the AI research assistant...
@@ -500,12 +549,14 @@ export function ChatPanel() {
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Biomni Co-pilot</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            MyBioAI Co-pilot
+          </h1>
           <p className="text-sm text-gray-600">
             Ask me anything about biomedical research
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {/* WebSocket Connection Status */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs">
@@ -525,12 +576,14 @@ export function ChatPanel() {
           {/* Streaming Toggle */}
           <button
             onClick={toggleStreaming}
-            className={`btn btn-sm ${isUsingStreaming ? 'btn-primary' : 'btn-outline'}`}
-            title={isUsingStreaming ? 'Disable streaming' : 'Enable streaming'}
+            className={`btn btn-sm ${
+              isUsingStreaming ? "btn-primary" : "btn-outline"
+            }`}
+            title={isUsingStreaming ? "Disable streaming" : "Enable streaming"}
           >
-            {isUsingStreaming ? 'Streaming ON' : 'Streaming OFF'}
+            {isUsingStreaming ? "Streaming ON" : "Streaming OFF"}
           </button>
-          
+
           <button
             onClick={() => setIsUploadModalOpen(true)}
             disabled={!isInitialized}
@@ -568,7 +621,7 @@ export function ChatPanel() {
                 <Bot className="w-8 h-8 text-primary-600" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Welcome to Biomni
+                Welcome to MyBioAI
               </h3>
               <p className="text-sm text-gray-600 mb-6">
                 I'm your AI research assistant. I can help you with:
@@ -597,7 +650,8 @@ export function ChatPanel() {
               </div>
               <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs text-blue-800">
-                  💡 <strong>Tip:</strong> Use the upload button in the header to add your own datasets during the conversation!
+                  💡 <strong>Tip:</strong> Use the upload button in the header
+                  to add your own datasets during the conversation!
                 </p>
               </div>
             </div>
@@ -648,7 +702,7 @@ export function ChatPanel() {
             </button>
           </div>
         </form>
-        
+
         {error && (
           <div className="mt-2 text-sm text-error-600 bg-error-50 p-2 rounded">
             {error}
