@@ -1,82 +1,82 @@
-import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  Wrench, 
-  Database, 
-  Settings, 
+import { NavLink } from "react-router-dom";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Wrench,
+  Database,
+  Settings,
   FileText,
   History,
   FlaskConical,
   Dna,
   Microscope,
-  Activity
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  Activity,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navigation = [
   {
-    name: 'Dashboard',
-    href: '/dashboard',
+    name: "Dashboard",
+    href: "/dashboard",
     icon: LayoutDashboard,
-    description: 'Overview and quick actions',
+    description: "Overview and quick actions",
   },
   {
-    name: 'Chat',
-    href: '/chat',
+    name: "Chat",
+    href: "/chat",
     icon: MessageSquare,
-    description: 'Interactive AI research assistant',
+    description: "Interactive AI research assistant",
   },
   {
-    name: 'Tools',
-    href: '/tools',
+    name: "Tools",
+    href: "/tools",
     icon: Wrench,
-    description: 'Biomedical analysis tools',
+    description: "Biomedical analysis tools",
   },
   {
-    name: 'Data Lake',
-    href: '/data',
+    name: "Data Lake",
+    href: "/data",
     icon: Database,
-    description: 'Biological datasets and resources',
+    description: "Biological datasets and resources",
   },
   {
-    name: 'Configuration',
-    href: '/configuration',
+    name: "Configuration",
+    href: "/configuration",
     icon: Settings,
-    description: 'Agent and system settings',
+    description: "Agent and system settings",
   },
   {
-    name: 'Sessions',
-    href: '/sessions',
+    name: "Sessions",
+    href: "/sessions",
     icon: History,
-    description: 'Research session history',
+    description: "Research session history",
   },
 ];
 
 const toolCategories = [
   {
-    name: 'Molecular Biology',
+    name: "Molecular Biology",
     icon: Dna,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
   },
   {
-    name: 'Genomics',
+    name: "Genomics",
     icon: Activity,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
+    color: "text-green-600",
+    bgColor: "bg-green-50",
   },
   {
-    name: 'Cell Biology',
+    name: "Cell Biology",
     icon: Microscope,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
   },
   {
-    name: 'Biochemistry',
+    name: "Biochemistry",
     icon: FlaskConical,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
+    color: "text-orange-600",
+    bgColor: "bg-orange-50",
   },
 ];
 
@@ -90,7 +90,7 @@ export function Sidebar() {
             <Dna className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Biomni</h1>
+            <h1 className="text-lg font-semibold text-gray-900">MyBioAI</h1>
             <p className="text-xs text-gray-500">AI Research Assistant</p>
           </div>
         </div>
@@ -109,10 +109,10 @@ export function Sidebar() {
                   to={item.href}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors group',
+                      "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors group",
                       isActive
-                        ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        ? "bg-primary-50 text-primary-700 border-r-2 border-primary-500"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                     )
                   }
                   title={item.description}
@@ -136,8 +136,13 @@ export function Sidebar() {
                 key={category.name}
                 className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
               >
-                <div className={cn('w-8 h-8 rounded-md flex items-center justify-center mr-3', category.bgColor)}>
-                  <category.icon className={cn('w-4 h-4', category.color)} />
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center mr-3",
+                    category.bgColor
+                  )}
+                >
+                  <category.icon className={cn("w-4 h-4", category.color)} />
                 </div>
                 <span className="text-gray-700 truncate">{category.name}</span>
               </div>
@@ -171,7 +176,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>v1.0.0</span>
-          <span>Biomni</span>
+          <span>MyBioAI</span>
         </div>
       </div>
     </div>

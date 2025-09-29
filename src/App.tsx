@@ -1,33 +1,28 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import { useAgentStore } from '@/store/agentStore';
-import { biomniAPI } from '@/lib/api';
-import toast from 'react-hot-toast';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAgentStore } from "@/store/agentStore";
+import { biomniAPI } from "@/lib/api";
+import toast from "react-hot-toast";
 
 // Layout components
-import { Layout } from '@/components/layout/Layout';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { Layout } from "@/components/layout/Layout";
+import { Sidebar } from "@/components/layout/Sidebar";
 
 // Page components
-import { Dashboard } from '@/pages/Dashboard';
-import { Chat } from '@/pages/Chat';
-import { Tools } from '@/pages/Tools';
-import { DataLake } from '@/pages/DataLake';
-import { Configuration } from '@/pages/Configuration';
-import { Sessions } from '@/pages/Sessions';
-import { Settings } from '@/pages/Settings';
+import { Dashboard } from "@/pages/Dashboard";
+import { Chat } from "@/pages/Chat";
+import { Tools } from "@/pages/Tools";
+import { DataLake } from "@/pages/DataLake";
+import { Configuration } from "@/pages/Configuration";
+import { Sessions } from "@/pages/Sessions";
+import { Settings } from "@/pages/Settings";
 
 // Components
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 function App() {
-  const { 
-    isInitialized, 
-    error, 
-    loadConfiguration, 
-    setError 
-  } = useAgentStore();
+  const { isInitialized, error, loadConfiguration, setError } = useAgentStore();
 
   useEffect(() => {
     // Check API availability on app start
@@ -35,16 +30,18 @@ function App() {
       try {
         const isAvailable = await biomniAPI.isAvailable();
         if (!isAvailable) {
-          toast.error('Backend API is not available. Please ensure the Biomni backend is running.');
-          setError('Backend API is not available');
+          toast.error(
+            "Backend API is not available. Please ensure the MyBioAI backend is running."
+          );
+          setError("Backend API is not available");
         } else {
           // Load configuration if API is available
           await loadConfiguration();
         }
       } catch (error) {
-        console.error('Failed to check API availability:', error);
-        toast.error('Failed to connect to backend API');
-        setError('Failed to connect to backend API');
+        console.error("Failed to check API availability:", error);
+        toast.error("Failed to connect to backend API");
+        setError("Failed to connect to backend API");
       }
     };
 
@@ -53,11 +50,11 @@ function App() {
 
   // Show loading screen while checking API
   if (!isInitialized && !error) {
-    return <LoadingScreen message="Connecting to Biomni backend..." />;
+    return <LoadingScreen message="Connecting to MyBioAI backend..." />;
   }
 
   // Show error screen if API is not available
-  if (error && error.includes('API')) {
+  if (error && error.includes("API")) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
@@ -80,9 +77,7 @@ function App() {
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Connection Error
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {error}
-            </p>
+            <p className="text-sm text-gray-600 mb-4">{error}</p>
             <button
               onClick={() => window.location.reload()}
               className="btn btn-primary"

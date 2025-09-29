@@ -1,8 +1,5 @@
-import { biomniAPI } from './api';
-import {
-  WebSocketConfig,
-  AgentQueryRequest,
-} from '@/types/biomni';
+import { biomniAPI } from "./api";
+import { WebSocketConfig, AgentQueryRequest } from "@/types/biomni";
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
@@ -25,17 +22,19 @@ export class WebSocketService {
         const sessionIds = Object.keys(sessionsResponse.data.sessions);
         if (sessionIds.length > 0) {
           this.sessionId = sessionIds[0];
-          console.log('Using existing session:', this.sessionId);
+          console.log("Using existing session:", this.sessionId);
         }
       }
     } catch (error) {
-      console.error('Failed to initialize session:', error);
+      console.error("Failed to initialize session:", error);
     }
   }
 
-  public async connect(config: Omit<WebSocketConfig, 'sessionId'>): Promise<WebSocket> {
+  public async connect(
+    config: Omit<WebSocketConfig, "sessionId">
+  ): Promise<WebSocket> {
     if (this.isConnecting) {
-      throw new Error('Connection already in progress');
+      throw new Error("Connection already in progress");
     }
 
     this.isConnecting = true;
@@ -47,7 +46,7 @@ export class WebSocketService {
       }
 
       if (!this.sessionId) {
-        throw new Error('No session ID available');
+        throw new Error("No session ID available");
       }
 
       const wsConfig: WebSocketConfig = {
@@ -56,13 +55,13 @@ export class WebSocketService {
       };
 
       this.ws = biomniAPI.createWebSocketConnection(wsConfig);
-      
+
       this.ws.onopen = () => {
-        console.log('WebSocket connected for session:', this.sessionId);
+        console.log("WebSocket connected for session:", this.sessionId);
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         this.reconnectDelay = 1000;
-        
+
         // Send any queued messages
         while (this.messageQueue.length > 0) {
           const message = this.messageQueue.shift();
@@ -73,21 +72,24 @@ export class WebSocketService {
       };
 
       this.ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
+        console.log("WebSocket closed:", event.code, event.reason);
         this.isConnecting = false;
-        
+
         if (config.onClose) {
           config.onClose();
         }
 
         // Attempt to reconnect if not a normal closure
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+        if (
+          event.code !== 1000 &&
+          this.reconnectAttempts < this.maxReconnectAttempts
+        ) {
           this.attemptReconnect(config);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error("WebSocket error:", error);
         this.isConnecting = false;
       };
 
@@ -98,15 +100,17 @@ export class WebSocketService {
     }
   }
 
-  private async attemptReconnect(config: Omit<WebSocketConfig, 'sessionId'>) {
+  private async attemptReconnect(config: Omit<WebSocketConfig, "sessionId">) {
     this.reconnectAttempts++;
-    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-    
+    console.log(
+      `Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+    );
+
     setTimeout(async () => {
       try {
         await this.connect(config);
       } catch (error) {
-        console.error('Reconnection failed:', error);
+        console.error("Reconnection failed:", error);
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectDelay *= 2; // Exponential backoff
           this.attemptReconnect(config);
@@ -117,7 +121,7 @@ export class WebSocketService {
 
   public sendMessage(request: AgentQueryRequest): void {
     if (!this.ws) {
-      throw new Error('WebSocket not connected');
+      throw new Error("WebSocket not connected");
     }
 
     if (this.ws.readyState === WebSocket.OPEN) {
@@ -136,13 +140,13 @@ export class WebSocketService {
       };
       this.messageQueue.push(JSON.stringify(payload));
     } else {
-      throw new Error('WebSocket is not open');
+      throw new Error("WebSocket is not open");
     }
   }
 
   public disconnect(): void {
     if (this.ws) {
-      this.ws.close(1000, 'Client disconnecting');
+      this.ws.close(1000, "Client disconnecting");
       this.ws = null;
     }
     this.messageQueue = [];

@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Save, RefreshCw } from 'lucide-react';
-import { useAgentStore } from '@/store/agentStore';
-import { BiomniConfig } from '@/types/biomni';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { Save, RefreshCw } from "lucide-react";
+import { useAgentStore } from "@/store/agentStore";
+import { BiomniConfig } from "@/types/biomni";
+import toast from "react-hot-toast";
 
 export function Configuration() {
-  const {
-    config,
-    isLoadingConfig,
-    loadConfiguration,
-  } = useAgentStore();
+  const { config, isLoadingConfig, loadConfiguration } = useAgentStore();
 
   const [formData, setFormData] = useState<Partial<BiomniConfig>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -26,9 +22,9 @@ export function Configuration() {
     setIsSaving(true);
     try {
       // In a real implementation, you'd call the API to update configuration
-      toast.success('Configuration saved successfully');
+      toast.success("Configuration saved successfully");
     } catch (error) {
-      toast.error('Failed to save configuration');
+      toast.error("Failed to save configuration");
     } finally {
       setIsSaving(false);
     }
@@ -37,7 +33,7 @@ export function Configuration() {
   const handleReset = () => {
     if (config) {
       setFormData(config);
-      toast.success('Configuration reset to defaults');
+      toast.success("Configuration reset to defaults");
     }
   };
 
@@ -63,9 +59,13 @@ export function Configuration() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Reset
           </button>
-          <button onClick={handleSave} disabled={isSaving} className="btn btn-primary">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="btn btn-primary"
+          >
             <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
@@ -84,11 +84,15 @@ export function Configuration() {
                 LLM Model
               </label>
               <select
-                value={formData.llm || ''}
-                onChange={(e) => setFormData({ ...formData, llm: e.target.value })}
+                value={formData.llm || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, llm: e.target.value })
+                }
                 className="input"
               >
-                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                <option value="claude-sonnet-4-20250514">
+                  Claude Sonnet 4
+                </option>
                 <option value="gpt-4">GPT-4</option>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
               </select>
@@ -104,7 +108,12 @@ export function Configuration() {
                 max="1"
                 step="0.1"
                 value={formData.temperature || 0.7}
-                onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    temperature: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -121,7 +130,12 @@ export function Configuration() {
               <input
                 type="number"
                 value={formData.timeout_seconds || 600}
-                onChange={(e) => setFormData({ ...formData, timeout_seconds: parseInt(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    timeout_seconds: parseInt(e.target.value),
+                  })
+                }
                 className="input"
                 min="60"
                 max="3600"
@@ -133,10 +147,18 @@ export function Configuration() {
                 type="checkbox"
                 id="use_tool_retriever"
                 checked={formData.use_tool_retriever || false}
-                onChange={(e) => setFormData({ ...formData, use_tool_retriever: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    use_tool_retriever: e.target.checked,
+                  })
+                }
                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
-              <label htmlFor="use_tool_retriever" className="ml-2 text-sm text-gray-700">
+              <label
+                htmlFor="use_tool_retriever"
+                className="ml-2 text-sm text-gray-700"
+              >
                 Use tool retriever for intelligent tool selection
               </label>
             </div>
@@ -147,7 +169,9 @@ export function Configuration() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">System Settings</h3>
-            <p className="card-description">Configure system paths and resources</p>
+            <p className="card-description">
+              Configure system paths and resources
+            </p>
           </div>
           <div className="card-content space-y-4">
             <div>
@@ -156,8 +180,10 @@ export function Configuration() {
               </label>
               <input
                 type="text"
-                value={formData.path || './data'}
-                onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                value={formData.path || "./data"}
+                onChange={(e) =>
+                  setFormData({ ...formData, path: e.target.value })
+                }
                 className="input"
                 placeholder="./data"
               />
@@ -168,8 +194,10 @@ export function Configuration() {
                 LLM Source
               </label>
               <select
-                value={formData.source || ''}
-                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                value={formData.source || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, source: e.target.value })
+                }
                 className="input"
               >
                 <option value="">Auto-detect</option>
@@ -187,8 +215,10 @@ export function Configuration() {
               </label>
               <input
                 type="url"
-                value={formData.base_url || ''}
-                onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
+                value={formData.base_url || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, base_url: e.target.value })
+                }
                 className="input"
                 placeholder="https://api.example.com/v1"
               />
@@ -200,8 +230,10 @@ export function Configuration() {
               </label>
               <input
                 type="password"
-                value={formData.api_key || ''}
-                onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                value={formData.api_key || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, api_key: e.target.value })
+                }
                 className="input"
                 placeholder="Enter API key"
               />
@@ -214,7 +246,9 @@ export function Configuration() {
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">Current Configuration</h3>
-          <p className="card-description">View the current system configuration</p>
+          <p className="card-description">
+            View the current system configuration
+          </p>
         </div>
         <div className="card-content">
           <pre className="bg-gray-50 p-4 rounded-md text-sm overflow-x-auto">
