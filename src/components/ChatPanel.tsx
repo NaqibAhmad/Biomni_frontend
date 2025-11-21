@@ -7,8 +7,6 @@ import {
   Copy,
   Download,
   RefreshCw,
-  Upload,
-  Database,
   ThumbsUp,
   ThumbsDown,
   Wifi,
@@ -17,17 +15,40 @@ import {
   Award,
   Lightbulb,
   FileText,
+  X,
+  Upload,
 } from "lucide-react";
 import { useAgentStore } from "@/store/agentStore";
 import { ChatMessage } from "@/types/biomni";
-import { formatRelativeTime, copyToClipboard, downloadFile } from "@/lib/utils";
+import {
+  formatRelativeTime,
+  copyToClipboard,
+  downloadFile,
+  downloadChatAsDocx,
+} from "@/lib/utils";
 import toast from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { UploadDataModal } from "@/components/modals/UploadDataModal";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
+import { FeedbackModal } from "@/components/modals/FeedbackModal";
+import { SavePromptModal } from "@/components/modals/SavePromptModal";
+import { biomniAPI } from "@/lib/api";
+import { useLocation, useNavigate } from "react-router-dom";
+import { BookmarkPlus } from "lucide-react";
+
+interface AvailableModel {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+  is_default: boolean;
+}
 
 export function ChatPanel() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     messages,
     isProcessing,
@@ -50,11 +71,25 @@ export function ChatPanel() {
   const [input, setInput] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(
+    null
+  );
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isUsingStreaming, setIsUsingStreaming] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [defaultModel, setDefaultModel] = useState<string>("");
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [hasAutoSent, setHasAutoSent] = useState(false);
+  const [isSavePromptModalOpen, setIsSavePromptModalOpen] = useState(false);
+  const [selectedPromptText, setSelectedPromptText] = useState<string>("");
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isUpdatingMessagesRef = useRef(false);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -75,17 +110,249 @@ export function ChatPanel() {
     }
   }, [isInitialized, isInitializing]);
 
-  // Initialize session on component mount
+  // Auto-send initial message from location state (e.g., from prompt library)
+  useEffect(() => {
+    const state = location.state as {
+      initialMessage?: string;
+      promptTitle?: string;
+    } | null;
+    if (
+      state?.initialMessage &&
+      isInitialized &&
+      !hasAutoSent &&
+      !isProcessing &&
+      !isStreaming
+    ) {
+      const initialMessage = state.initialMessage;
+      setHasAutoSent(true);
+
+      // Show toast if there's a prompt title
+      if (state.promptTitle) {
+        toast.success(`Executing prompt: ${state.promptTitle}`);
+      }
+
+      // Clear location state to prevent re-sending on re-renders
+      navigate(location.pathname, { replace: true, state: {} });
+
+      // Set input and trigger submit
+      setInput(initialMessage);
+
+      // Use a small delay to ensure state is set
+      setTimeout(async () => {
+        // Manually trigger the send logic
+        const userMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "user",
+          content: initialMessage,
+          timestamp: new Date(),
+        };
+        addMessage(userMessage);
+
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Processing your request...",
+          timestamp: new Date(),
+          metadata: { status: "pending" as const },
+        };
+        addMessage(assistantMessage);
+
+        // Get the actual model to use (selectedModel or defaultModel)
+        const modelToUse = selectedModel || defaultModel;
+        const selectedModelData = availableModels.find((m) => m.id === modelToUse);
+        
+        console.log(`[ChatPanel] Auto-sending message with model: ${modelToUse}, source: ${selectedModelData?.source || 'default'}`);
+
+        if (isUsingStreaming) {
+          // Always ensure WebSocket is connected before sending
+          if (!isConnected && currentSessionId) {
+            toast.loading("Connecting to WebSocket...");
+            try {
+              await connect(currentSessionId); // Wait for connection
+              toast.success("WebSocket connected");
+            } catch (error) {
+              console.error("WebSocket connection failed:", error);
+              toast.error(`WebSocket connection failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+              setInput(initialMessage); // Restore input so user can retry
+              return; // Don't proceed if connection fails
+            }
+          }
+          
+          // Double-check connection state after waiting
+          if (!isConnected) {
+            toast.error("WebSocket is not connected. Please wait and try again.");
+            setInput(initialMessage); // Restore input
+            return;
+          }
+
+          clearStreamingLogs();
+          sendWebSocketMessage({
+            prompt: initialMessage,
+            self_critic: false,
+            test_time_scale_round: 0,
+            model: modelToUse,
+            source: selectedModelData?.source,
+          });
+        } else {
+          queryAgent({
+            prompt: initialMessage,
+            self_critic: false,
+            test_time_scale_round: 0,
+            model: modelToUse,
+            source: selectedModelData?.source,
+          });
+        }
+
+        setInput("");
+      }, 100);
+    }
+  }, [
+    location.state,
+    isInitialized,
+    hasAutoSent,
+    isProcessing,
+    isStreaming,
+    isConnected,
+    isUsingStreaming,
+    currentSessionId,
+    selectedModel,
+    defaultModel,
+    availableModels,
+    navigate,
+    location.pathname,
+    addMessage,
+    clearStreamingLogs,
+    sendWebSocketMessage,
+    queryAgent,
+    connect,
+  ]);
+
+  // Initialize session on component mount - generate a new UUID
   useEffect(() => {
     if (isInitialized && !currentSessionId) {
-      setCurrentSessionId("329cb31d-3533-4772-b869-bc100a49bcb9");
+      // Generate a new UUID for the session
+      const newSessionId = crypto.randomUUID();
+      setCurrentSessionId(newSessionId);
+      console.log(`Generated new session ID: ${newSessionId}`);
     }
   }, [isInitialized, currentSessionId]);
+
+  // Load uploaded files for current session
+  useEffect(() => {
+    if (currentSessionId) {
+      loadUploadedFiles();
+    }
+  }, [currentSessionId]);
+
+  const loadUploadedFiles = async () => {
+    setIsLoadingFiles(true);
+    try {
+      // Try with session_id first, then without if it fails
+      let response;
+      try {
+        response = await biomniAPI.getUserFiles({
+          session_id: currentSessionId || undefined,
+          limit: 50,
+        });
+      } catch (sessionError: any) {
+        // If session-based query fails, try without session filter
+        console.warn(
+          "Failed to load files with session, trying without session filter:",
+          sessionError
+        );
+        response = await biomniAPI.getUserFiles({
+          limit: 50,
+        });
+      }
+
+      if (response.data) {
+        const files = response.data.files || [];
+        console.log(`Loaded ${files.length} files:`, files);
+        setUploadedFiles(files);
+      } else {
+        console.warn("No data in response:", response);
+        setUploadedFiles([]);
+      }
+    } catch (error: any) {
+      console.error("Failed to load uploaded files:", error);
+      console.error("Error details:", error.message, error.response?.data);
+      toast.error(`Failed to load files: ${error.message || "Unknown error"}`);
+      setUploadedFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string, filename: string) => {
+    if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+      return;
+    }
+
+    try {
+      await biomniAPI.deleteFile(fileId);
+      toast.success("File deleted successfully");
+      // Reload files list
+      await loadUploadedFiles();
+    } catch (error: any) {
+      console.error("Failed to delete file:", error);
+      toast.error(error.message || "Failed to delete file");
+    }
+  };
+
+  const handleDownloadFile = async (file: any) => {
+    try {
+      const fileId = file.id || file.filename;
+      // Use relative path - the API client will handle the base URL
+      const downloadUrl = `/api/data/download/${fileId}`;
+      // For production with proxy, use the proxy path
+      const isProduction = window.location.hostname.includes("vercel.app");
+      const finalUrl = isProduction
+        ? `/api/proxy/api/data/download/${fileId}`
+        : downloadUrl;
+      // Open in new tab to trigger download
+      window.open(finalUrl, "_blank");
+      toast.success("Download started");
+    } catch (error: any) {
+      console.error("Failed to download file:", error);
+      toast.error(error.message || "Failed to download file");
+    }
+  };
+
+  // Load available models
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const response = await biomniAPI.getAvailableModels();
+        if (response.data) {
+          setAvailableModels(response.data.models);
+          setDefaultModel(response.data.default_model);
+          // Set selected model to default, ensuring it's never empty
+          if (response.data.default_model) {
+            setSelectedModel(response.data.default_model);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load models:", error);
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Ensure selectedModel is always set to a valid value
+  useEffect(() => {
+    if (availableModels.length > 0 && !selectedModel && defaultModel) {
+      setSelectedModel(defaultModel);
+    }
+  }, [availableModels, defaultModel, selectedModel]);
 
   // Initialize WebSocket connection when session is available
   useEffect(() => {
     if (isInitialized && currentSessionId && isUsingStreaming && !isConnected) {
-      connect(currentSessionId);
+      console.log("[ChatPanel] Auto-connecting WebSocket...");
+      connect(currentSessionId).catch((error) => {
+        console.error("[ChatPanel] Auto-connect failed:", error);
+        // Don't show toast here - let user actions trigger connection attempts
+      });
     }
   }, [isInitialized, currentSessionId, isUsingStreaming, isConnected, connect]);
 
@@ -213,22 +480,46 @@ export function ChatPanel() {
     };
     addMessage(assistantMessage);
 
-    if (isUsingStreaming && isConnected) {
+    // Get the actual model to use (selectedModel or defaultModel)
+    const modelToUse = selectedModel || defaultModel;
+    const selectedModelData = availableModels.find((m) => m.id === modelToUse);
+    
+    console.log(`[ChatPanel] Sending message with model: ${modelToUse}, source: ${selectedModelData?.source || 'default'}`);
+
+    if (isUsingStreaming) {
+      // Always ensure WebSocket is connected before sending
+      if (!isConnected && currentSessionId) {
+        toast.loading("Connecting to WebSocket...");
+        try {
+          await connect(currentSessionId); // Wait for connection
+        } catch (error) {
+          console.error("WebSocket connection failed:", error);
+          toast.error(`WebSocket connection failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+          return; // Don't proceed if connection fails
+        }
+      }
+      
+      // Double-check connection state after waiting
+      if (!isConnected) {
+        toast.error("WebSocket is not connected. Please wait and try again.");
+        return;
+      }
+
       clearStreamingLogs();
       sendWebSocketMessage({
         prompt: input.trim(),
         self_critic: false,
         test_time_scale_round: 0,
+        model: modelToUse,
+        source: selectedModelData?.source,
       });
-    } else if (isUsingStreaming && !isConnected) {
-      toast.error(
-        "WebSocket not connected. Please check connection or disable streaming."
-      );
     } else {
       await queryAgent({
         prompt: input.trim(),
         self_critic: false,
         test_time_scale_round: 0,
+        model: modelToUse,
+        source: selectedModelData?.source,
       });
     }
     setInput("");
@@ -262,20 +553,89 @@ export function ChatPanel() {
     }
   };
 
-  const handleDownloadChat = () => {
+  const handleDownloadChat = (format: "txt" | "docx") => {
+    if (format === "txt") {
     const chatContent = messages
       .map(
-        (msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+          (msg) =>
+            `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
       )
       .join("\n\n");
 
     downloadFile(chatContent, `mybioai-chat-${Date.now()}.txt`);
-    toast.success("Chat downloaded");
+      toast.success("Chat downloaded as TXT");
+    } else {
+      downloadChatAsDocx(messages, `mybioai-chat-${Date.now()}.docx`)
+        .then(() => {
+          toast.success("Chat downloaded as DOCX");
+        })
+        .catch((error) => {
+          console.error("Error downloading DOCX:", error);
+          toast.error("Failed to download as DOCX");
+        });
+    }
+    setIsDownloadMenuOpen(false);
   };
+
+  const handleDownloadResponse = async (message: ChatMessage) => {
+    try {
+      // Create a single message array for the download function
+      await downloadChatAsDocx(
+        [message],
+        `mybioai-response-${Date.now()}.docx`
+      );
+      toast.success("Response downloaded as DOCX");
+    } catch (error: any) {
+      console.error("Failed to download response:", error);
+      toast.error(error.message || "Failed to download response");
+    }
+  };
+
+  // Close download menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        downloadMenuRef.current &&
+        !downloadMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsDownloadMenuOpen(false);
+      }
+    };
+
+    if (isDownloadMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDownloadMenuOpen]);
 
   const handleClearChat = () => {
     clearMessages();
+    clearStreamingLogs();
     toast.success("Chat cleared");
+  };
+
+  const handleFeedbackClick = (messageId: string) => {
+    setFeedbackMessageId(messageId);
+    setIsFeedbackModalOpen(true);
+  };
+
+  // Find the user prompt that corresponds to an assistant response
+  const findUserPromptForResponse = (responseMessageId: string): string => {
+    const responseIndex = messages.findIndex(
+      (msg) => msg.id === responseMessageId
+    );
+    if (responseIndex === -1) return "No prompt available";
+
+    // Look backwards to find the most recent user message before this response
+    for (let i = responseIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        return messages[i].content;
+      }
+    }
+    return "No prompt available";
   };
 
   const renderMessage = (message: ChatMessage) => {
@@ -318,6 +678,13 @@ export function ChatPanel() {
                     title="Copy solution"
                   >
                     <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDownloadResponse(message)}
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Download response as DOCX"
+                  >
+                    <Download className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -399,19 +766,24 @@ export function ChatPanel() {
                       <CheckCircle className="w-4 h-4 text-green-500" />
                       <span>Research analysis completed successfully</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                        title="Helpful solution"
-                      >
-                        <ThumbsUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Not helpful"
-                      >
-                        <ThumbsDown className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center gap-3">
+                      <FeedbackButton
+                        onClick={() => handleFeedbackClick(message.id)}
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                          title="Helpful solution"
+                        >
+                          <ThumbsUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Not helpful"
+                        >
+                          <ThumbsDown className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -456,6 +828,27 @@ export function ChatPanel() {
               </span>
             </div>
 
+            {isUser && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setSelectedPromptText(message.content);
+                    setIsSavePromptModalOpen(true);
+                  }}
+                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Save to Prompt Library"
+                >
+                  <BookmarkPlus className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleCopyMessage(message.content)}
+                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Copy message"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {!isUser && (
               <div className="flex items-center gap-1">
                 <button
@@ -558,6 +951,22 @@ export function ChatPanel() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Model Selector */}
+          {availableModels.length > 0 && (
+            <select
+              value={selectedModel || defaultModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              title="Select AI model"
+            >
+              {availableModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* WebSocket Connection Status */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs">
             {isConnected ? (
@@ -584,23 +993,34 @@ export function ChatPanel() {
             {isUsingStreaming ? "Streaming ON" : "Streaming OFF"}
           </button>
 
+          <div className="relative" ref={downloadMenuRef}>
           <button
-            onClick={() => setIsUploadModalOpen(true)}
-            disabled={!isInitialized}
-            className="btn btn-outline btn-sm"
-            title="Upload dataset"
-          >
-            <Upload className="w-4 h-4 mr-1" />
-            <Database className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleDownloadChat}
+              onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)}
             disabled={messages.length === 0}
             className="btn btn-outline btn-sm"
             title="Download chat"
           >
             <Download className="w-4 h-4" />
           </button>
+            {isDownloadMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                <button
+                  onClick={() => handleDownloadChat("txt")}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Download as TXT
+                </button>
+                <button
+                  onClick={() => handleDownloadChat("docx")}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Download as DOCX
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleClearChat}
             disabled={messages.length === 0}
@@ -684,8 +1104,8 @@ export function ChatPanel() {
               type="button"
               onClick={() => setIsUploadModalOpen(true)}
               disabled={!isInitialized}
-              className="btn btn-outline btn-sm"
-              title="Upload dataset"
+              className="btn btn-outline"
+              title="Upload file"
             >
               <Upload className="w-4 h-4" />
             </button>
@@ -703,9 +1123,117 @@ export function ChatPanel() {
           </div>
         </form>
 
-        {error && (
+        {error &&
+          !error.includes("Custom software retrieval") &&
+          !error.includes("Custom data not found") && (
           <div className="mt-2 text-sm text-error-600 bg-error-50 p-2 rounded">
             {error}
+          </div>
+        )}
+      </div>
+
+      {/* Uploaded Files Section - Always visible */}
+      <div className="border-t border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Uploaded Files{" "}
+            {uploadedFiles.length > 0 && `(${uploadedFiles.length})`}
+          </h3>
+          <button
+            onClick={loadUploadedFiles}
+            disabled={isLoadingFiles}
+            className="text-xs text-primary-600 hover:text-primary-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            {isLoadingFiles ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-3 h-3" />
+                Refresh
+              </>
+            )}
+          </button>
+        </div>
+        {isLoadingFiles ? (
+          <div className="text-center py-4 text-sm text-gray-500">
+            Loading files...
+          </div>
+        ) : uploadedFiles.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {uploadedFiles.map((file) => (
+              <div
+                key={file.id || file.filename}
+                className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm hover:shadow-sm transition-shadow"
+              >
+                <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-medium text-gray-900 truncate max-w-[200px]"
+                    title={file.original_filename || file.filename}
+                  >
+                    {file.original_filename || file.filename}
+                  </p>
+                  {file.description && (
+                    <p
+                      className="text-xs text-gray-500 truncate max-w-[200px]"
+                      title={file.description}
+                    >
+                      {file.description}
+                    </p>
+                  )}
+                  {/* Display Tags */}
+                  {file.tags &&
+                    Array.isArray(file.tags) &&
+                    file.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {file.tags.map((tag: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="text-xs px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                  )}
+                  {file.file_size && (
+                    <p className="text-xs text-gray-400">
+                      {(file.file_size / 1024).toFixed(2)} KB
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Download Button */}
+                  <button
+                    onClick={() => handleDownloadFile(file)}
+                    className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
+                    title="Download file"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                <button
+                  onClick={() =>
+                    handleDeleteFile(
+                      file.id || file.filename,
+                      file.original_filename || file.filename
+                    )
+                  }
+                    className="p-1 text-gray-400 hover:text-error-600 transition-colors"
+                  title="Delete file"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-sm text-gray-500">
+            No files uploaded yet. Use the upload button above to add files.
           </div>
         )}
       </div>
@@ -713,7 +1241,45 @@ export function ChatPanel() {
       {/* Upload Modal */}
       <UploadDataModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          // Reload files after upload
+          if (currentSessionId) {
+            loadUploadedFiles();
+          }
+        }}
+        sessionId={currentSessionId}
+      />
+
+      {/* Feedback Modal */}
+      {feedbackMessageId && (
+        <FeedbackModal
+          isOpen={isFeedbackModalOpen}
+          onClose={() => {
+            setIsFeedbackModalOpen(false);
+            setFeedbackMessageId(null);
+          }}
+          outputId={feedbackMessageId || ""}
+          prompt={findUserPromptForResponse(feedbackMessageId || "")}
+          response={
+            messages.find((msg) => msg.id === feedbackMessageId)?.content ||
+            "No response available"
+          }
+          sessionId={currentSessionId || undefined}
+        />
+      )}
+
+      {/* Save Prompt Modal */}
+      <SavePromptModal
+        isOpen={isSavePromptModalOpen}
+        onClose={() => {
+          setIsSavePromptModalOpen(false);
+          setSelectedPromptText("");
+        }}
+        onSuccess={() => {
+          toast.success("Prompt saved successfully!");
+        }}
+        promptText={selectedPromptText}
       />
     </div>
   );

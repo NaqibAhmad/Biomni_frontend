@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useAgentStore } from "@/store/agentStore";
 import { biomniAPI } from "@/lib/api";
-import toast from "react-hot-toast";
 
 // Layout components
 import { Layout } from "@/components/layout/Layout";
@@ -14,100 +13,163 @@ import { Chat } from "@/pages/Chat";
 import { Tools } from "@/pages/Tools";
 import { DataLake } from "@/pages/DataLake";
 import { Configuration } from "@/pages/Configuration";
-import { Sessions } from "@/pages/Sessions";
 import { Settings } from "@/pages/Settings";
+import { PromptLibrary } from "@/pages/PromptLibrary";
+import Login from "@/pages/Login";
 
 // Components
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 function App() {
-  const { isInitialized, error, loadConfiguration, setError } = useAgentStore();
+  const { isInitialized, loadConfiguration } = useAgentStore();
 
   useEffect(() => {
-    // Check API availability on app start
+    // Check API availability on app start (non-blocking, silent)
     const checkAPI = async () => {
       try {
+        console.log("Checking backend availability...");
         const isAvailable = await biomniAPI.isAvailable();
-        if (!isAvailable) {
-          toast.error(
-            "Backend API is not available. Please ensure the MyBioAI backend is running."
-          );
-          setError("Backend API is not available");
-        } else {
+        console.log("Backend available:", isAvailable);
+        if (isAvailable) {
           // Load configuration if API is available
+          console.log("Loading configuration...");
+          try {
           await loadConfiguration();
+            console.log("Configuration loaded successfully");
+          } catch (configError: any) {
+            console.warn(
+              "Failed to load configuration, but continuing anyway:",
+              configError
+            );
+            // Don't show toast - just log it
+          }
+        } else {
+          // Backend not available - just log it, don't show error
+          console.warn(
+            "Backend API is not available. Some features may not work."
+          );
         }
-      } catch (error) {
-        console.error("Failed to check API availability:", error);
-        toast.error("Failed to connect to backend API");
-        setError("Failed to connect to backend API");
+      } catch (error: any) {
+        // Silently handle errors - don't show toasts
+        console.warn("Failed to check API availability:", error);
+      } finally {
+        // Always mark as initialized so the app can load
+        // Even if backend is down, user can still see the UI
+        useAgentStore.setState({ isInitialized: true });
       }
     };
 
     checkAPI();
-  }, [loadConfiguration, setError]);
+  }, [loadConfiguration]);
 
-  // Show loading screen while checking API
-  if (!isInitialized && !error) {
-    return <LoadingScreen message="Connecting to MyBioAI backend..." />;
-  }
-
-  // Show error screen if API is not available
-  if (error && error.includes("API")) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-error-100 mb-4">
-              <svg
-                className="h-6 w-6 text-error-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Connection Error
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="btn btn-primary"
-            >
-              Retry Connection
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  // Show loading screen only briefly while checking API
+  if (!isInitialized) {
+    return <LoadingScreen message="Loading MyBioAI..." />;
   }
 
   return (
     <ErrorBoundary>
-      <Layout>
-        <Sidebar />
-        <main className="flex-1 overflow-hidden">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/tools" element={<Tools />} />
-            <Route path="/data" element={<DataLake />} />
-            <Route path="/configuration" element={<Configuration />} />
-            <Route path="/sessions" element={<Sessions />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </main>
-      </Layout>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<Login />} />
+        
+        {/* Protected routes */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <Dashboard />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <Chat />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tools"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <Tools />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/data"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <DataLake />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/configuration"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <Configuration />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/prompts"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <PromptLibrary />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Sidebar />
+                <main className="flex-1 overflow-hidden">
+                  <Settings />
+                </main>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </ErrorBoundary>
   );
 }

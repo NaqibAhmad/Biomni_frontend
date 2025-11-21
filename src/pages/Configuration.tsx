@@ -1,14 +1,26 @@
 import { useState, useEffect } from "react";
-import { Save, RefreshCw } from "lucide-react";
+import { Save, RefreshCw, Loader2 } from "lucide-react";
 import { useAgentStore } from "@/store/agentStore";
+import { biomniAPI } from "@/lib/api";
 import { BiomniConfig } from "@/types/biomni";
 import toast from "react-hot-toast";
+
+interface AvailableModel {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+  is_default: boolean;
+}
 
 export function Configuration() {
   const { config, isLoadingConfig, loadConfiguration } = useAgentStore();
 
   const [formData, setFormData] = useState<Partial<BiomniConfig>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [defaultModel, setDefaultModel] = useState<string>("");
 
   useEffect(() => {
     if (!config) {
@@ -16,15 +28,67 @@ export function Configuration() {
     } else {
       setFormData(config);
     }
+    loadAvailableModels();
   }, [config, loadConfiguration]);
+
+  // Update source when model or available models change
+  useEffect(() => {
+    if (availableModels.length > 0 && formData.llm) {
+      const selectedModel = availableModels.find((m) => m.id === formData.llm);
+      if (
+        selectedModel &&
+        (!formData.source || formData.source === "Unknown")
+      ) {
+        setFormData((prev) => ({ ...prev, source: selectedModel.source }));
+      }
+    }
+  }, [availableModels, formData.llm]);
+
+  const loadAvailableModels = async () => {
+    setIsLoadingModels(true);
+    try {
+      const response = await biomniAPI.getAvailableModels();
+      if (response.data) {
+        setAvailableModels(response.data.models);
+        setDefaultModel(response.data.default_model);
+      }
+    } catch (error: any) {
+      console.error("Failed to load available models:", error);
+      toast.error("Failed to load available models");
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // In a real implementation, you'd call the API to update configuration
+      // Ensure source is set based on selected model
+      const selectedModel = availableModels.find(
+        (m) => m.id === (formData.llm || defaultModel)
+      );
+      const configToSave = {
+        ...formData,
+        source: selectedModel?.source || formData.source || "Anthropic", // Default to Anthropic if not set
+      };
+
+      // Validate that source is set
+      if (!configToSave.source || configToSave.source === "Unknown") {
+        if (selectedModel) {
+          configToSave.source = selectedModel.source;
+        } else {
+          toast.error("Please select a valid model");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      await biomniAPI.updateConfiguration(configToSave);
+      // Reload configuration to get updated values
+      await loadConfiguration();
       toast.success("Configuration saved successfully");
-    } catch (error) {
-      toast.error("Failed to save configuration");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save configuration");
     } finally {
       setIsSaving(false);
     }
@@ -83,19 +147,43 @@ export function Configuration() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 LLM Model
               </label>
-              <select
-                value={formData.llm || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, llm: e.target.value })
-                }
-                className="input"
-              >
-                <option value="claude-sonnet-4-20250514">
-                  Claude Sonnet 4
-                </option>
-                <option value="gpt-4">GPT-4</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              </select>
+              {isLoadingModels ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading models...
+                </div>
+              ) : (
+                <select
+                  value={formData.llm || defaultModel || ""}
+                  onChange={(e) => {
+                    const selectedModelId = e.target.value;
+                    const selectedModel = availableModels.find(
+                      (m) => m.id === selectedModelId
+                    );
+                    setFormData({
+                      ...formData,
+                      llm: selectedModelId,
+                      // Automatically set source based on selected model
+                      source: selectedModel?.source || formData.source,
+                    });
+                  }}
+                  className="input"
+                >
+                  {availableModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} {model.is_default && "(Default)"} -{" "}
+                      {model.source}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {availableModels.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {availableModels.find(
+                    (m) => m.id === (formData.llm || defaultModel)
+                  )?.description || ""}
+                </p>
+              )}
             </div>
 
             <div>
@@ -161,82 +249,6 @@ export function Configuration() {
               >
                 Use tool retriever for intelligent tool selection
               </label>
-            </div>
-          </div>
-        </div>
-
-        {/* System Settings */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">System Settings</h3>
-            <p className="card-description">
-              Configure system paths and resources
-            </p>
-          </div>
-          <div className="card-content space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Path
-              </label>
-              <input
-                type="text"
-                value={formData.path || "./data"}
-                onChange={(e) =>
-                  setFormData({ ...formData, path: e.target.value })
-                }
-                className="input"
-                placeholder="./data"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                LLM Source
-              </label>
-              <select
-                value={formData.source || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, source: e.target.value })
-                }
-                className="input"
-              >
-                <option value="">Auto-detect</option>
-                <option value="OpenAI">OpenAI</option>
-                <option value="Anthropic">Anthropic</option>
-                <option value="AzureOpenAI">Azure OpenAI</option>
-                <option value="Gemini">Google Gemini</option>
-                <option value="Groq">Groq</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Custom Base URL
-              </label>
-              <input
-                type="url"
-                value={formData.base_url || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, base_url: e.target.value })
-                }
-                className="input"
-                placeholder="https://api.example.com/v1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Custom API Key
-              </label>
-              <input
-                type="password"
-                value={formData.api_key || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, api_key: e.target.value })
-                }
-                className="input"
-                placeholder="Enter API key"
-              />
             </div>
           </div>
         </div>

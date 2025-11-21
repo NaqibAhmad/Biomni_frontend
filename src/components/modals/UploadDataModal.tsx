@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
-import { X, Upload, AlertCircle, Loader2 } from "lucide-react";
+import { X, Upload, AlertCircle, Loader2, Plus, Trash2 } from "lucide-react";
 import { useAgentStore } from "@/store/agentStore";
+import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 
 interface UploadDataModalProps {
   isOpen: boolean;
   onClose: () => void;
+  sessionId?: string | null; // Optional session ID to link files to
 }
 
 interface FileInfo {
@@ -13,14 +15,20 @@ interface FileInfo {
   size: number;
   type: string;
   description: string;
+  tags: string[];
 }
 
-export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
+export function UploadDataModal({
+  isOpen,
+  onClose,
+  sessionId,
+}: UploadDataModalProps) {
   const { addCustomData } = useAgentStore();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInfos, setFileInfos] = useState<FileInfo[]>([]);
+  const [tagInputs, setTagInputs] = useState<Record<number, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,13 +40,36 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
       size: file.size,
       type: file.type,
       description: "",
+      tags: ["custom_data"], // Default tag
     }));
     setFileInfos(newFileInfos);
+    // Initialize tag inputs
+    const newTagInputs: Record<number, string> = {};
+    files.forEach((_, index) => {
+      newTagInputs[index] = "";
+    });
+    setTagInputs(newTagInputs);
   };
 
   const updateFileDescription = (index: number, description: string) => {
     const updatedInfos = [...fileInfos];
     updatedInfos[index].description = description;
+    setFileInfos(updatedInfos);
+  };
+
+  const addTag = (index: number) => {
+    const tagInput = tagInputs[index]?.trim();
+    if (tagInput && !fileInfos[index]?.tags?.includes(tagInput)) {
+      const updatedInfos = [...fileInfos];
+      updatedInfos[index].tags = [...(updatedInfos[index].tags || []), tagInput];
+      setFileInfos(updatedInfos);
+      setTagInputs({ ...tagInputs, [index]: "" });
+    }
+  };
+
+  const removeTag = (index: number, tag: string) => {
+    const updatedInfos = [...fileInfos];
+    updatedInfos[index].tags = updatedInfos[index].tags?.filter((t) => t !== tag) || [];
     setFileInfos(updatedInfos);
   };
 
@@ -105,29 +136,46 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
         formData.append("file", file);
         formData.append("description", fileInfo.description);
         formData.append("name", file.name);
+        // Add tags as JSON array
+        if (fileInfo.tags && fileInfo.tags.length > 0) {
+          formData.append("tags", JSON.stringify(fileInfo.tags));
+        }
 
-        // Upload file
+        // Add session_id if provided
+        if (sessionId) {
+          formData.append("session_id", sessionId);
+        }
+
+        // Upload file using fetch with authentication
         const isProduction = window.location.hostname.includes("vercel.app");
         const apiBaseUrl =
           import.meta.env.VITE_API_BASE_URL ||
           (isProduction
             ? "https://api.mybioai.net" // Vercel proxy route
-            : "http:localhost:8000"); // Direct connection for local
-        console.log("Upload API Base URL:", apiBaseUrl);
-        console.log(
-          "Environment VITE_API_BASE_URL:",
-          import.meta.env.VITE_API_BASE_URL
-        );
-        console.log("Is Production:", isProduction);
+            : "http://localhost:8000"); // Direct connection for local
+
+        // Get authentication token
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const headers: HeadersInit = {};
+        if (session?.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
 
         const response = await fetch(`${apiBaseUrl}/api/data/upload`, {
           method: "POST",
+          headers,
           body: formData,
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(
-            `Failed to upload ${file.name}: ${response.statusText}`
+            errorData.detail ||
+              errorData.message ||
+              `Failed to upload ${file.name}: ${response.statusText}`
           );
         }
 
@@ -142,6 +190,15 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
           type: file.type,
           uploaded_at: new Date().toISOString(),
         });
+
+        // Log file_id for debugging
+        if (result.file_id) {
+          console.log(`File uploaded successfully with ID: ${result.file_id}`);
+        } else {
+          console.warn(
+            "File uploaded but no file_id returned - may not be stored in database"
+          );
+        }
 
         // Update progress
         setUploadProgress(((i + 1) / selectedFiles.length) * 100);
@@ -168,6 +225,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
   const resetForm = () => {
     setSelectedFiles([]);
     setFileInfos([]);
+    setTagInputs({});
     setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -275,7 +333,7 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                       </button>
                     </div>
 
-                    <div>
+                    <div className="mb-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Description *
                       </label>
@@ -289,6 +347,59 @@ export function UploadDataModal({ isOpen, onClose }: UploadDataModalProps) {
                         disabled={isUploading}
                         required
                       />
+                    </div>
+
+                    {/* Tags */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tags
+                      </label>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={tagInputs[index] || ""}
+                          onChange={(e) =>
+                            setTagInputs({ ...tagInputs, [index]: e.target.value })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addTag(index);
+                            }
+                          }}
+                          placeholder="Add a tag and press Enter"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          disabled={isUploading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addTag(index)}
+                          disabled={isUploading}
+                          className="btn btn-outline btn-sm"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {fileInfos[index]?.tags && fileInfos[index].tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {fileInfos[index].tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs"
+                            >
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => removeTag(index, tag)}
+                                disabled={isUploading}
+                                className="hover:text-blue-900"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

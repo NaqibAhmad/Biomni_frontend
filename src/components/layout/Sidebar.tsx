@@ -5,14 +5,13 @@ import {
   Wrench,
   Database,
   Settings,
-  FileText,
-  History,
-  FlaskConical,
   Dna,
-  Microscope,
-  Activity,
+  LogOut,
+  User,
+  BookMarked,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
   {
@@ -40,47 +39,30 @@ const navigation = [
     description: "Biological datasets and resources",
   },
   {
+    name: "Prompt Library",
+    href: "/prompts",
+    icon: BookMarked,
+    description: "Manage prompt templates",
+  },
+  {
     name: "Configuration",
     href: "/configuration",
     icon: Settings,
     description: "Agent and system settings",
   },
-  {
-    name: "Sessions",
-    href: "/sessions",
-    icon: History,
-    description: "Research session history",
-  },
-];
-
-const toolCategories = [
-  {
-    name: "Molecular Biology",
-    icon: Dna,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  {
-    name: "Genomics",
-    icon: Activity,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    name: "Cell Biology",
-    icon: Microscope,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-  {
-    name: "Biochemistry",
-    icon: FlaskConical,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-  },
 ];
 
 export function Sidebar() {
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+    }
+  };
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
@@ -124,57 +106,31 @@ export function Sidebar() {
             ))}
           </ul>
         </div>
-
-        {/* Tool Categories */}
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Tool Categories
-          </h3>
-          <div className="space-y-2">
-            {toolCategories.map((category) => (
-              <div
-                key={category.name}
-                className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-              >
-                <div
-                  className={cn(
-                    "w-8 h-8 rounded-md flex items-center justify-center mr-3",
-                    category.bgColor
-                  )}
-                >
-                  <category.icon className={cn("w-4 h-4", category.color)} />
-                </div>
-                <span className="text-gray-700 truncate">{category.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Quick Actions
-          </h3>
-          <div className="space-y-1">
-            <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors">
-              <FileText className="w-5 h-5 mr-3 flex-shrink-0" />
-              <span className="truncate">New Session</span>
-            </button>
-            <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors">
-              <Database className="w-5 h-5 mr-3 flex-shrink-0" />
-              <span className="truncate">Add Data</span>
-            </button>
-            <button className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors">
-              <Wrench className="w-5 h-5 mr-3 flex-shrink-0" />
-              <span className="truncate">Add Tool</span>
-            </button>
-          </div>
-        </div>
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+      {/* Footer - User Profile & Logout */}
+      <div className="p-4 border-t border-gray-200 space-y-2">
+        {/* User Info */}
+        <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-md">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
+            <User className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            <span className="text-sm text-gray-700 truncate">
+              {user?.email || "Loading..."}
+            </span>
+          </div>
+        </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 transition-colors"
+        >
+          <LogOut className="w-4 h-4 mr-2 flex-shrink-0" />
+          <span>Sign Out</span>
+        </button>
+
+        {/* Version */}
+        <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
           <span>v1.0.0</span>
           <span>MyBioAI</span>
         </div>

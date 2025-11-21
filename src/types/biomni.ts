@@ -33,6 +33,7 @@ export interface DataLakeItem {
   name: string;
   description: string;
   path?: string;
+  tags?: string[];
 }
 
 export interface LibraryItem {
@@ -53,6 +54,8 @@ export interface CustomData {
   size?: number;
   type?: string;
   uploaded_at?: string;
+  tags?: string[];
+  id?: string; // File ID for deletion
 }
 
 export interface CustomSoftware {
@@ -150,6 +153,8 @@ export interface AgentQueryRequest {
   prompt: string;
   self_critic?: boolean;
   test_time_scale_round?: number;
+  model?: string;
+  source?: string;
 }
 
 export interface ToolAddRequest {

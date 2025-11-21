@@ -100,7 +100,7 @@ interface AgentState {
   setCurrentTask: (task?: string) => void;
 
   // WebSocket management
-  connect: (sessionId: string) => void;
+  connect: (sessionId: string) => Promise<void>;
   disconnect: () => void;
   sendWebSocketMessage: (message: AgentQueryRequest) => void;
   clearStreamingLogs: () => void;
@@ -260,9 +260,34 @@ export const useAgentStore = create<AgentState>()(
     },
 
     // WebSocket management
-    connect: (sessionId: string) => {
+    connect: (sessionId: string): Promise<void> => {
+      // If already connected, return immediately
       if (ws?.readyState === WebSocket.OPEN) {
-        return;
+        return Promise.resolve();
+      }
+
+      // If connecting, wait for it to complete
+      if (ws?.readyState === WebSocket.CONNECTING) {
+        return new Promise((resolve, reject) => {
+          const checkConnection = setInterval(() => {
+            if (ws?.readyState === WebSocket.OPEN) {
+              clearInterval(checkConnection);
+              resolve();
+            } else if (
+              ws?.readyState === WebSocket.CLOSED ||
+              ws?.readyState === WebSocket.CLOSING
+            ) {
+              clearInterval(checkConnection);
+              reject(new Error("WebSocket connection failed"));
+            }
+          }, 100);
+
+          // Timeout after 10 seconds
+          setTimeout(() => {
+            clearInterval(checkConnection);
+            reject(new Error("WebSocket connection timeout"));
+          }, 10000);
+        });
       }
 
       get().clearStreamingLogs();
@@ -290,18 +315,91 @@ export const useAgentStore = create<AgentState>()(
         },
       };
 
-      try {
-        ws = biomniAPI.createWebSocketConnection(config);
-        set({ isConnected: true });
-      } catch (err) {
-        set({
-          streamingError:
-            err instanceof Error
-              ? err.message
-              : "Failed to connect to WebSocket",
-          isConnected: false,
-        });
-      }
+      return new Promise((resolve, reject) => {
+        try {
+          ws = biomniAPI.createWebSocketConnection(config);
+
+          // Set up connection timeout
+          const connectionTimeout = setTimeout(() => {
+            if (ws && ws.readyState !== WebSocket.OPEN) {
+              ws.close();
+              set({
+                streamingError: "WebSocket connection timed out",
+                isConnected: false,
+              });
+              reject(
+                new Error("WebSocket connection timed out after 10 seconds")
+              );
+            }
+          }, 10000);
+
+          // Override onopen to resolve promise
+          const originalOnOpen = ws.onopen;
+          ws.onopen = (event) => {
+            clearTimeout(connectionTimeout);
+            if (originalOnOpen && ws) {
+              try {
+                originalOnOpen.call(ws, event);
+              } catch {
+                // Ignore errors from original handler
+              }
+            }
+            set({ isConnected: true });
+            resolve(); // Resolve when connected
+          };
+
+          // Override onerror to reject promise
+          const originalOnError = ws.onerror;
+          ws.onerror = (error) => {
+            clearTimeout(connectionTimeout);
+            if (originalOnError && ws) {
+              try {
+                originalOnError.call(ws, error);
+              } catch {
+                // Ignore errors from original handler
+              }
+            }
+            set({
+              streamingError: "Failed to connect to WebSocket",
+              isConnected: false,
+            });
+            reject(new Error("WebSocket connection failed"));
+          };
+
+          // Override onclose to handle unexpected closures
+          const originalOnClose = ws.onclose;
+          ws.onclose = (event) => {
+            clearTimeout(connectionTimeout);
+            if (originalOnClose && ws) {
+              try {
+                originalOnClose.call(ws, event);
+              } catch {
+                // Ignore errors from original handler
+              }
+            }
+            set({ isConnected: false, isStreaming: false });
+            // Only reject if we haven't resolved yet (connection was closed before opening)
+            if (ws?.readyState === WebSocket.CLOSED && !get().isConnected) {
+              reject(
+                new Error(
+                  `WebSocket closed: ${event.code} ${
+                    event.reason || "Unknown reason"
+                  }`
+                )
+              );
+            }
+          };
+        } catch (err) {
+          set({
+            streamingError:
+              err instanceof Error
+                ? err.message
+                : "Failed to connect to WebSocket",
+            isConnected: false,
+          });
+          reject(err);
+        }
+      });
     },
 
     disconnect: () => {
@@ -422,27 +520,78 @@ export const useAgentStore = create<AgentState>()(
 
     loadCustomResources: async () => {
       try {
-        const [toolsResponse, dataResponse, softwareResponse] =
-          await Promise.all([
+        console.log("[agentStore] loadCustomResources: Starting...");
+
+        // Use Promise.allSettled to handle individual failures without breaking the entire operation
+        const [toolsResult, dataResult, softwareResult] =
+          await Promise.allSettled([
             biomniAPI.getCustomTools(),
             biomniAPI.getCustomData(),
             biomniAPI.getCustomSoftware(),
           ]);
 
+        // Extract results, handling both fulfilled and rejected promises
+        const toolsResponse =
+          toolsResult.status === "fulfilled"
+            ? toolsResult.value
+            : { success: false, data: [] };
+        const dataResponse =
+          dataResult.status === "fulfilled"
+            ? dataResult.value
+            : { success: false, data: [] };
+        const softwareResponse =
+          softwareResult.status === "fulfilled"
+            ? softwareResult.value
+            : { success: false, data: [] };
+
+        // Log any errors but continue processing
+        if (toolsResult.status === "rejected") {
+          console.warn(
+            "[agentStore] getCustomTools failed:",
+            toolsResult.reason
+          );
+        }
+        if (dataResult.status === "rejected") {
+          console.warn("[agentStore] getCustomData failed:", dataResult.reason);
+        }
+        if (softwareResult.status === "rejected") {
+          console.warn(
+            "[agentStore] getCustomSoftware failed:",
+            softwareResult.reason
+          );
+        }
+
+        console.log("[agentStore] dataResponse:", dataResponse);
+        console.log("[agentStore] dataResponse.success:", dataResponse.success);
+        console.log("[agentStore] dataResponse.data:", dataResponse.data);
+
+        const loadedCustomData = dataResponse.success
+          ? dataResponse.data || []
+          : [];
+        console.log("[agentStore] Setting customData:", loadedCustomData);
+        console.log(
+          "[agentStore] customData with tags:",
+          loadedCustomData.filter((item) => item.tags && item.tags.length > 0)
+        );
+
         set({
           customTools: toolsResponse.success ? toolsResponse.data || [] : [],
-          customData: dataResponse.success ? dataResponse.data || [] : [],
+          customData: loadedCustomData,
           customSoftware: softwareResponse.success
             ? softwareResponse.data || []
             : [],
         });
+
+        console.log(
+          "[agentStore] Store updated. Current customData:",
+          get().customData
+        );
       } catch (error) {
-        set({
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load custom resources",
-        });
+        console.error(
+          "[agentStore] Unexpected error loading custom resources:",
+          error
+        );
+        // Don't set error state here as individual failures are handled above
       }
     },
 
@@ -543,7 +692,7 @@ export const useAgentStore = create<AgentState>()(
 
     removeCustomData: async (name: string) => {
       try {
-        // Find the custom data item to get the filename
+        // Find the custom data item to get the file ID
         const customDataItem = get().customData.find(
           (data) => data.name === name
         );
@@ -551,25 +700,22 @@ export const useAgentStore = create<AgentState>()(
           throw new Error("Custom data not found");
         }
 
-        // Extract filename from path (remove timestamp prefix)
-        const filename = customDataItem.path.split("/").pop() || name;
-
-        // Call backend to delete the file
-        const response = await fetch(
-          `https://api.mybioai.net/api/data/${filename}`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete file: ${response.statusText}`);
+        // Get file ID - use id if available, otherwise try to extract from path
+        let fileId: string;
+        if (customDataItem.id) {
+          fileId = customDataItem.id;
+        } else {
+          // Fallback: try to extract from path (filename with timestamp prefix)
+          const pathParts = customDataItem.path.split(/[/\\]/);
+          const filename = pathParts[pathParts.length - 1];
+          fileId = filename;
         }
 
-        // Remove from store
-        set((state) => ({
-          customData: state.customData.filter((data) => data.name !== name),
-        }));
+        // Call backend to delete the file using the API client
+        await biomniAPI.deleteFile(fileId);
+
+        // Reload custom resources to refresh the list
+        await get().loadCustomResources();
       } catch (error) {
         set({
           error:

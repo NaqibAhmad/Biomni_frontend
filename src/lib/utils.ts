@@ -104,6 +104,66 @@ export function downloadFile(content: string, filename: string, type: string = '
   URL.revokeObjectURL(url);
 }
 
+export async function downloadChatAsDocx(
+  messages: Array<{ role: string; content: string; timestamp: Date }>,
+  filename?: string
+): Promise<void> {
+  try {
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
+    
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              text: "MyBioAI Chat Export",
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({
+              text: `Exported on: ${new Date().toLocaleString()}`,
+            }),
+            new Paragraph({ text: "" }), // Empty line
+            ...messages.flatMap((msg, index) => [
+              new Paragraph({
+                text: `${msg.role === "user" ? "User" : "MyBioAI Assistant"}`,
+                heading: HeadingLevel.HEADING_2,
+              }),
+              new Paragraph({
+                text: `Time: ${msg.timestamp.toLocaleString()}`,
+                children: [
+                  new TextRun({
+                    text: `Time: ${msg.timestamp.toLocaleString()}`,
+                    italics: true,
+                    size: 20, // 10pt
+                  }),
+                ],
+              }),
+              new Paragraph({
+                text: msg.content,
+              }),
+              ...(index < messages.length - 1 ? [new Paragraph({ text: "" })] : []), // Empty line between messages
+            ]),
+          ],
+        },
+      ],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `mybioai-chat-${Date.now()}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error creating DOCX:', error);
+    throw new Error('Failed to export chat as DOCX');
+  }
+}
+
 export function parseMarkdownCodeBlocks(text: string): Array<{ language: string; code: string }> {
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
   const blocks: Array<{ language: string; code: string }> = [];

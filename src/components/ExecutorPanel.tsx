@@ -903,7 +903,7 @@ export function ExecutorPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {/* Streaming Logs */}
         {streamingLogs && streamingLogs.length > 0 && (
-          <>
+          <div className="space-y-3">
             <StructuredLogViewer content={streamingLogs.join("\n")} />
             {isStreaming && (
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 shadow-sm">
@@ -915,7 +915,7 @@ export function ExecutorPanel({
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* Show loader when streaming but no logs yet */}
@@ -926,75 +926,81 @@ export function ExecutorPanel({
         {/* Show completion indicator when processing is done */}
         {processingComplete && !isStreaming && <ProcessingCompleteIndicator />}
 
-        {executorLogs.length === 0 &&
-        (!streamingLogs || streamingLogs.length === 0) &&
-        !isStreaming &&
-        !processingComplete ? (
-          <div className="text-center text-gray-500 mt-8">
-            <Wrench className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="font-medium">No execution logs yet</p>
-            <p className="text-sm">
-              Start a conversation to see live backend logs
-            </p>
-          </div>
-        ) : executorLogs.length > 0 ? (
-          executorLogs.map((log: any) => (
-            <div
-              key={log.id}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm"
-            >
-              {/* Log Header */}
+        {/* Executor Logs */}
+        {executorLogs.length > 0 && (
+          <div className="space-y-3">
+            {executorLogs.map((log: any) => (
               <div
-                className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => toggleLog(log.id)}
+                key={log.id}
+                className="bg-white rounded-lg border border-gray-200 shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  {getLogIcon(log.type)}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">
-                      {log.title}
-                    </span>
-                    {getLogStatusIcon(log.status)}
+                {/* Log Header */}
+                <div
+                  className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => toggleLog(log.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    {getLogIcon(log.type)}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">
+                        {log.title}
+                      </span>
+                      {getLogStatusIcon(log.status)}
+                    </div>
+                    {log.stepNumber && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        Step {log.stepNumber}
+                      </span>
+                    )}
+                    {log.duration && (
+                      <span className="text-xs text-gray-500">
+                        ({log.duration})
+                      </span>
+                    )}
                   </div>
-                  {log.stepNumber && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      Step {log.stepNumber}
-                    </span>
-                  )}
-                  {log.duration && (
-                    <span className="text-xs text-gray-500">
-                      ({log.duration})
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(log.content);
+                      }}
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Copy content"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    {collapsedLogs.has(log.id) ? (
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(log.content);
-                    }}
-                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Copy content"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  {collapsedLogs.has(log.id) ? (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  )}
-                </div>
-              </div>
 
-              {/* Log Content */}
-              {!collapsedLogs.has(log.id) && (
-                <div className="px-3 pb-3 border-t border-gray-100">
-                  <div className="pt-3">{renderLogContent(log)}</div>
-                </div>
-              )}
+                {/* Log Content */}
+                {!collapsedLogs.has(log.id) && (
+                  <div className="px-3 pb-3 border-t border-gray-100">
+                    <div className="pt-3">{renderLogContent(log)}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state - only show if both streaming logs and executor logs are empty */}
+        {executorLogs.length === 0 &&
+          (!streamingLogs || streamingLogs.length === 0) &&
+          !isStreaming &&
+          !processingComplete && (
+            <div className="text-center text-gray-500 mt-8">
+              <Wrench className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="font-medium">No execution logs yet</p>
+              <p className="text-sm">
+                Start a conversation to see live backend logs
+              </p>
             </div>
-          ))
-        ) : null}
+          )}
         <div ref={logsEndRef} />
       </div>
 

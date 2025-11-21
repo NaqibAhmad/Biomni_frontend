@@ -5,9 +5,7 @@ import {
   Wrench,
   MessageSquare,
   TrendingUp,
-  Clock,
   CheckCircle,
-  AlertCircle,
   BookOpen,
   FlaskConical,
   Dna,
@@ -80,7 +78,6 @@ export function Dashboard() {
   const {
     isInitialized,
     isProcessing,
-    error,
     config,
     tools,
     dataLake,
@@ -97,30 +94,34 @@ export function Dashboard() {
   const [connectivityStatus, setConnectivityStatus] = useState<
     "checking" | "connected" | "disconnected"
   >("checking");
-  const [connectivityError, setConnectivityError] = useState<string>("");
 
   useEffect(() => {
-    // Test connectivity first
+    // Test connectivity first (silent - no error messages)
     const testConnectivity = async () => {
       try {
         setConnectivityStatus("checking");
+        console.log("Testing backend connectivity...");
         const isConnected = await biomniAPI.testConnectivity();
+        console.log("Backend connectivity result:", isConnected);
         if (isConnected) {
           setConnectivityStatus("connected");
-          setConnectivityError("");
         } else {
           setConnectivityStatus("disconnected");
-          setConnectivityError("Backend is not reachable");
         }
-      } catch (error) {
+      } catch (error: any) {
+        console.warn("Connectivity test error:", error);
         setConnectivityStatus("disconnected");
-        setConnectivityError(
-          error instanceof Error ? error.message : "Connection failed"
-        );
       }
     };
 
     testConnectivity();
+
+    // Set up periodic connectivity check every 30 seconds
+    const interval = setInterval(() => {
+      testConnectivity();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -138,18 +139,13 @@ export function Dashboard() {
           console.log("Dashboard resources loaded successfully");
         } catch (error) {
           console.error("Failed to load dashboard resources:", error);
+          // Don't throw - just log the error
         }
       };
       loadResources();
     }
-  }, [
-    connectivityStatus,
-    isInitialized,
-    loadTools,
-    loadDataLake,
-    loadSoftwareLibrary,
-    loadCustomResources,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectivityStatus, isInitialized]);
 
   const stats = [
     {
@@ -220,25 +216,25 @@ export function Dashboard() {
               Status: {systemStatus.processing}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                connectivityStatus === "connected"
-                  ? "bg-success-500"
-                  : connectivityStatus === "checking"
-                  ? "bg-warning-500"
-                  : "bg-error-500"
-              }`}
-            ></div>
-            <span className="text-sm text-gray-600">
-              Backend:{" "}
-              {connectivityStatus === "connected"
-                ? "Connected"
-                : connectivityStatus === "checking"
-                ? "Checking..."
-                : "Disconnected"}
-            </span>
-          </div>
+          {/* Only show backend status when connected or checking - hide when disconnected */}
+          {(connectivityStatus === "connected" ||
+            connectivityStatus === "checking") && (
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  connectivityStatus === "connected"
+                    ? "bg-success-500"
+                    : "bg-warning-500"
+                }`}
+              ></div>
+              <span className="text-sm text-gray-600">
+                Backend:{" "}
+                {connectivityStatus === "connected"
+                  ? "Connected"
+                  : "Checking..."}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -350,22 +346,6 @@ export function Dashboard() {
                   <span className="text-sm font-medium">{config.llm}</span>
                 </div>
               )}
-
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-error-50 rounded-md">
-                  <AlertCircle className="w-4 h-4 text-error-600" />
-                  <span className="text-sm text-error-700">{error}</span>
-                </div>
-              )}
-
-              {connectivityError && (
-                <div className="flex items-center gap-2 p-3 bg-error-50 rounded-md">
-                  <AlertCircle className="w-4 h-4 text-error-600" />
-                  <span className="text-sm text-error-700">
-                    Backend Error: {connectivityError}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -423,23 +403,6 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">Recent Activity</h3>
-          <p className="card-description">Your latest research sessions</p>
-        </div>
-        <div className="card-content">
-          <div className="text-center py-8 text-gray-500">
-            <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No recent activity</p>
-            <p className="text-sm">
-              Start a new chat to see your research history here
-            </p>
           </div>
         </div>
       </div>
